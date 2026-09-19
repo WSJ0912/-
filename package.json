@@ -1,0 +1,15 @@
+{
+  "name": "medical-imaging-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "胸部 X 光片多标签筛查科研与软件原型",
+  "scripts": {
+    "desktop:dev": "npm --prefix apps/desktop run dev",
+    "desktop:build": "npm --prefix apps/desktop run build",
+    "desktop:dist": "npm --prefix apps/desktop run dist",
+    "test:python": "python -m unittest discover -s tests/python -v"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

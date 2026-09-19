@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Study",
+  "type": "object",
+  "required": ["studyId", "createdAt", "modality", "bodyPart", "viewPosition", "adultConfirmed", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "studyId": {"type": "string", "pattern": "^ST-[A-Z0-9-]+$"},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "modality": {"enum": ["DX", "CR", "CT", "UNKNOWN"]},
+    "bodyPart": {"enum": ["CHEST", "UNKNOWN"]},
+    "viewPosition": {"enum": ["AP", "PA", "UNKNOWN"]},
+    "adultConfirmed": {"type": "boolean"},
+    "status": {"enum": ["staged", "ready", "rejected", "reviewed"]}
+  }
+}

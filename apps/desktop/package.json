@@ -1,0 +1,89 @@
+{
+  "name": "medical-imaging-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "医疗影像智能识别平台桌面端",
+  "author": "Medical Imaging Platform contributors",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "node ../../scripts/dev-desktop.mjs",
+    "build": "tsc --noEmit && vite build",
+    "build:service": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ../../scripts/build-inference-service.ps1",
+    "dist": "npm run build:service && npm run build && electron-builder --win nsis --x64",
+    "test:main": "node --test --experimental-test-isolation=none tests/*.test.cjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cornerstonejs/core": "^5.10.7",
+    "@cornerstonejs/dicom-image-loader": "^5.10.7",
+    "@cornerstonejs/tools": "^5.10.7",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^44.4.3",
+    "electron-builder": "^26.15.3",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5"
+  },
+  "overrides": {
+    "adm-zip": "0.6.1",
+    "fflate": "0.8.3",
+    "uuid": "11.1.1"
+  },
+  "build": {
+    "appId": "org.medicalimaging.platform",
+    "productName": "医疗影像智能识别平台",
+    "asar": true,
+    "electronDist": "node_modules/electron/dist",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "renderer-dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../../services/inference/dist/inference-service",
+        "to": "inference-service",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../../LICENSE",
+        "to": "legal/LICENSE.txt"
+      },
+      {
+        "from": "../../third_party",
+        "to": "legal/third_party",
+        "filter": [
+          "**/*.md",
+          "**/*.txt"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  }
+}

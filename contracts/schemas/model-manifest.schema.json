@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/medmodel-1.schema.json",
+  "title": "Medical imaging model manifest",
+  "type": "object",
+  "required": ["schemaVersion", "modelId", "version", "architecture", "labels", "input", "thresholds", "preprocessing", "training", "dataSources", "license", "files", "modelSha256", "manifestSha256"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {"const": "medmodel-1"},
+    "modelId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"},
+    "version": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"},
+    "architecture": {"const": "densenet121"},
+    "labels": {"type": "array", "const": ["Atelectasis", "Cardiomegaly", "Consolidation", "Edema", "Enlarged Cardiomediastinum", "Fracture", "Lung Lesion", "Lung Opacity", "No Finding", "Pleural Effusion", "Pleural Other", "Pneumonia", "Pneumothorax", "Support Devices"]},
+    "input": {"type": "object", "required": ["width", "height", "channels", "normalization"], "additionalProperties": false, "properties": {"width": {"const": 320}, "height": {"const": 320}, "channels": {"const": 1}, "normalization": {"const": "imagenet-gray"}}},
+    "thresholds": {"type": "object", "minProperties": 14, "maxProperties": 14, "propertyNames": {"enum": ["Atelectasis", "Cardiomegaly", "Consolidation", "Edema", "Enlarged Cardiomediastinum", "Fracture", "Lung Lesion", "Lung Opacity", "No Finding", "Pleural Effusion", "Pleural Other", "Pneumonia", "Pneumothorax", "Support Devices"]}, "additionalProperties": {"type": "number", "minimum": 0, "maximum": 1}},
+    "preprocessing": {"type": "object", "required": ["viewPositions", "adultOnly"], "additionalProperties": false, "properties": {"viewPositions": {"const": ["AP", "PA"]}, "adultOnly": {"const": true}}},
+    "training": {"type": "object", "required": ["commit", "seeds", "method"], "additionalProperties": false, "properties": {"commit": {"type": "string", "minLength": 1}, "seeds": {"type": "array", "items": {"type": "integer"}, "minItems": 1}, "method": {"enum": ["baseline", "mixstyle"]}}},
+    "dataSources": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+    "license": {"type": "string", "minLength": 1},
+    "files": {"type": "object", "required": ["model.onnx", "labels.json"], "minProperties": 2, "propertyNames": {"pattern": "^(?!.*(?:^|/)\\.\\.(?:/|$))(?!/)(?!.*\\\\).+$"}, "additionalProperties": {"type": "string", "pattern": "^[a-f0-9]{64}$"}},
+    "modelSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "manifestSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  }
+}

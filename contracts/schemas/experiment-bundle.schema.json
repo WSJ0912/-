@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/medexperiment-1.schema.json",
+  "title": "Medical imaging experiment bundle",
+  "type": "object",
+  "required": ["schemaVersion", "experimentId", "config", "seeds", "datasetManifestSha256", "aggregateMetrics", "perClassMetrics", "curves", "modelCard"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {"const": "medexperiment-1"},
+    "experimentId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"},
+    "config": {"type": "object"},
+    "seeds": {"type": "array", "items": {"type": "integer"}, "minItems": 1},
+    "datasetManifestSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "aggregateMetrics": {"type": "object", "additionalProperties": {"type": ["number", "null"]}},
+    "perClassMetrics": {"type": "object", "additionalProperties": {"type": "object", "additionalProperties": {"type": ["number", "null"]}}},
+    "curves": {"type": "object"},
+    "modelCard": {"type": "object"}
+  }
+}

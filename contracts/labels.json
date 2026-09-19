@@ -1,0 +1,19 @@
+{
+  "version": "chexpert-14-v1",
+  "labels": [
+    {"key": "Atelectasis", "zh": "肺不张", "en": "Atelectasis", "kind": "abnormality", "primary": true},
+    {"key": "Cardiomegaly", "zh": "心脏增大", "en": "Cardiomegaly", "kind": "abnormality", "primary": true},
+    {"key": "Consolidation", "zh": "实变", "en": "Consolidation", "kind": "abnormality", "primary": true},
+    {"key": "Edema", "zh": "水肿", "en": "Edema", "kind": "abnormality", "primary": true},
+    {"key": "Enlarged Cardiomediastinum", "zh": "纵隔增宽", "en": "Enlarged Cardiomediastinum", "kind": "abnormality", "primary": false},
+    {"key": "Fracture", "zh": "骨折", "en": "Fracture", "kind": "abnormality", "primary": false},
+    {"key": "Lung Lesion", "zh": "肺部病灶", "en": "Lung Lesion", "kind": "abnormality", "primary": false},
+    {"key": "Lung Opacity", "zh": "肺部阴影", "en": "Lung Opacity", "kind": "abnormality", "primary": false},
+    {"key": "No Finding", "zh": "未见异常", "en": "No Finding", "kind": "status", "primary": false},
+    {"key": "Pleural Effusion", "zh": "胸腔积液", "en": "Pleural Effusion", "kind": "abnormality", "primary": true},
+    {"key": "Pleural Other", "zh": "其他胸膜病变", "en": "Pleural Other", "kind": "abnormality", "primary": false},
+    {"key": "Pneumonia", "zh": "肺炎", "en": "Pneumonia", "kind": "abnormality", "primary": false},
+    {"key": "Pneumothorax", "zh": "气胸", "en": "Pneumothorax", "kind": "abnormality", "primary": false},
+    {"key": "Support Devices", "zh": "支持性器械", "en": "Support Devices", "kind": "status", "primary": false}
+  ]
+}

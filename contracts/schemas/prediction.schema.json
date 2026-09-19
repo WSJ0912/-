@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Prediction",
+  "type": "object",
+  "required": ["predictionId", "studyId", "modelId", "modelVersion", "modelSha256", "manifestSha256", "createdAt", "probabilities", "logits", "thresholds", "camAvailable", "source"],
+  "additionalProperties": false,
+  "properties": {
+    "predictionId": {"type": "string", "minLength": 1},
+    "studyId": {"type": "string", "minLength": 1},
+    "modelId": {"type": "string", "minLength": 1},
+    "modelVersion": {"type": "string", "minLength": 1},
+    "modelSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "manifestSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "probabilities": {"type": "object", "minProperties": 14, "maxProperties": 14, "propertyNames": {"enum": ["Atelectasis", "Cardiomegaly", "Consolidation", "Edema", "Enlarged Cardiomediastinum", "Fracture", "Lung Lesion", "Lung Opacity", "No Finding", "Pleural Effusion", "Pleural Other", "Pneumonia", "Pneumothorax", "Support Devices"]}, "additionalProperties": {"type": ["number", "null"], "minimum": 0, "maximum": 1}},
+    "logits": {"type": "object", "minProperties": 14, "maxProperties": 14, "propertyNames": {"enum": ["Atelectasis", "Cardiomegaly", "Consolidation", "Edema", "Enlarged Cardiomediastinum", "Fracture", "Lung Lesion", "Lung Opacity", "No Finding", "Pleural Effusion", "Pleural Other", "Pneumonia", "Pneumothorax", "Support Devices"]}, "additionalProperties": {"type": ["number", "null"]}},
+    "thresholds": {"type": "object", "minProperties": 14, "maxProperties": 14, "propertyNames": {"enum": ["Atelectasis", "Cardiomegaly", "Consolidation", "Edema", "Enlarged Cardiomediastinum", "Fracture", "Lung Lesion", "Lung Opacity", "No Finding", "Pleural Effusion", "Pleural Other", "Pneumonia", "Pneumothorax", "Support Devices"]}, "additionalProperties": {"type": "number", "minimum": 0, "maximum": 1}},
+    "camAvailable": {"type": "boolean"},
+    "source": {"const": "onnx"}
+  }
+}

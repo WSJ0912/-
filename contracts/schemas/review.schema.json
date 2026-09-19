@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Review",
+  "type": "object",
+  "required": ["reviewId", "studyId", "predictionId", "doctorId", "createdAt", "decisions", "notes"],
+  "additionalProperties": false,
+  "properties": {
+    "reviewId": {"type": "string", "minLength": 1},
+    "studyId": {"type": "string", "minLength": 1},
+    "predictionId": {"type": "string", "minLength": 1},
+    "doctorId": {"type": "string", "minLength": 1},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "decisions": {"type": "object", "propertyNames": {"enum": ["Atelectasis", "Cardiomegaly", "Consolidation", "Edema", "Enlarged Cardiomediastinum", "Fracture", "Lung Lesion", "Lung Opacity", "No Finding", "Pleural Effusion", "Pleural Other", "Pneumonia", "Pneumothorax", "Support Devices"]}, "additionalProperties": {"enum": ["confirmed", "denied", "uncertain"]}},
+    "notes": {"type": "string", "maxLength": 10000}
+  }
+}

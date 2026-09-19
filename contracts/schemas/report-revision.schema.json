@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Report revision",
+  "type": "object",
+  "required": ["reportId", "studyId", "revision", "authorId", "createdAt", "body", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "reportId": {"type": "string", "minLength": 1},
+    "studyId": {"type": "string", "minLength": 1},
+    "revision": {"type": "integer", "minimum": 1},
+    "authorId": {"type": "string", "minLength": 1},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "body": {"type": "string", "maxLength": 50000},
+    "status": {"enum": ["draft", "confirmed"]},
+    "confirmedAt": {"type": "string", "format": "date-time"},
+    "reviewId": {"type": "string"}
+  }
+}

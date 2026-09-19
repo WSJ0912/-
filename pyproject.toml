@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "medical-imaging-platform"
+version = "0.1.0"
+description = "Reproducible chest X-ray research and local review prototype"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = { file = "LICENSE" }
+authors = [{ name = "Medical Imaging Platform contributors" }]
+dependencies = [
+  "numpy>=1.24",
+  "pydantic>=2.5",
+]
+
+[project.optional-dependencies]
+ml = [
+  "torch>=2.1",
+  "torchvision>=0.16",
+  "pandas>=2.0",
+  "scikit-learn>=1.3",
+  "Pillow>=10.0",
+  "onnx>=1.15",
+  "onnxruntime>=1.16",
+]
+service = [
+  "fastapi>=0.109",
+  "uvicorn[standard]>=0.27",
+  "onnxruntime>=1.16,<2",
+  "pydicom>=2.4",
+  "Pillow>=10.0",
+  "argon2-cffi>=23.1",
+  "reportlab>=4.0",
+]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.4",
+  "jsonschema>=4.21",
+  "httpx>=0.27",
+]
+build = [
+  "pyinstaller>=6.10",
+]
+
+[project.scripts]
+cxr-research = "cxr_research.cli:main"
+cxr-inference = "inference_service.cli:main"
+
+[tool.setuptools]
+packages = ["cxr_research", "inference_service"]
+package-dir = {cxr_research = "ml/cxr_research", inference_service = "services/inference/inference_service"}
+
+[tool.pytest.ini_options]
+testpaths = ["tests/python"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B"]
+ignore = ["B008"]
