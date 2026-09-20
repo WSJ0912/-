@@ -70,15 +70,26 @@ def sample_mimic_external(
     rng = random.Random(seed)
     patients = sorted(groups)
     rng.shuffle(patients)
+    considered = 0
+    missing_images = 0
     chosen: list[dict[str, Any]] = []
     for patient in patients[:target_patients]:
         candidates = sorted(groups[patient], key=lambda item: (item["studyId"], item["relativePath"]))
         item = candidates[rng.randrange(len(candidates))]
+        considered += 1
         image_path = root / item["relativePath"]
         if not image_path.is_file():
+            missing_images += 1
             continue
         item = {**item, "sizeBytes": image_path.stat().st_size}
         chosen.append(item)
+    # A wrong --image-root silently produced an empty but sealed manifest before;
+    # refuse instead, because an empty selection cannot be a valid external test set.
+    if considered and not chosen:
+        raise ValueError(
+            f"none of the {considered} sampled MIMIC images exist under {root}; "
+            "check --image-root, and do not seal a manifest from an empty selection"
+        )
     # Budget reduction follows the frozen random order and file sizes only.
     within_budget: list[dict[str, Any]] = []
     total = 0
@@ -94,6 +105,8 @@ def sample_mimic_external(
         "selectionRule": "adult AP/PA; one image per patient; fixed random order; file-size-only budget reduction",
         "requestedPatients": target_patients,
         "selectedPatients": len(within_budget),
+        "consideredPatients": considered,
+        "missingImages": missing_images,
         "maxBytes": max_bytes,
         "totalBytes": total,
         "records": within_budget,

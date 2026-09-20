@@ -152,6 +152,80 @@ class ResearchManifestTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             verify_external_manifest(first_path)
 
+    def test_mimic_sampling_refuses_to_seal_an_empty_selection(self) -> None:
+        """A wrong --image-root must fail instead of sealing an empty test set."""
+
+        root = case_directory("mimic-empty-selection")
+        image_root = root / "images"
+        image_root.mkdir()
+        rows = []
+        for patient in range(1, 5):
+            relative = f"p{patient}/s1.jpg"
+            rows.append(
+                {
+                    "subject_id": str(patient),
+                    "study_id": "1",
+                    "path": relative,
+                    "ViewPosition": "PA",
+                    "age": "60",
+                }
+            )
+        csv_path = root / "metadata.csv"
+        with csv_path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=list(rows[0].keys()))
+            writer.writeheader()
+            writer.writerows(rows)
+
+        output_path = root / "mimic-empty.json"
+        with self.assertRaises(ValueError):
+            sample_mimic_external(
+                csv_path,
+                output_path,
+                image_root=image_root,
+                target_patients=4,
+            )
+        # Nothing may be sealed when no image was found.
+        self.assertFalse(output_path.exists())
+        self.assertFalse(output_path.with_suffix(".json.sha256").exists())
+
+    def test_mimic_sampling_makes_partial_downloads_visible(self) -> None:
+        """Eligible patients whose files are absent are counted, not silently dropped."""
+
+        root = case_directory("mimic-partial-download")
+        image_root = root / "images"
+        image_root.mkdir()
+        rows = []
+        for patient in range(1, 7):
+            relative = f"p{patient}/s1.jpg"
+            if patient <= 4:
+                target = image_root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(bytes([patient]) * 10)
+            rows.append(
+                {
+                    "subject_id": str(patient),
+                    "study_id": "1",
+                    "path": relative,
+                    "ViewPosition": "PA",
+                    "age": "60",
+                }
+            )
+        csv_path = root / "metadata.csv"
+        with csv_path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=list(rows[0].keys()))
+            writer.writeheader()
+            writer.writerows(rows)
+
+        manifest = sample_mimic_external(
+            csv_path,
+            root / "mimic-partial.json",
+            image_root=image_root,
+            target_patients=6,
+        )
+        self.assertEqual(manifest["consideredPatients"], 6)
+        self.assertEqual(manifest["missingImages"], 2)
+        self.assertEqual(manifest["selectedPatients"], 4)
+
     def test_final_external_evaluation_emits_aggregate_result_only(self) -> None:
         root = case_directory("mimic-final-evaluation")
         image_root = root / "images"

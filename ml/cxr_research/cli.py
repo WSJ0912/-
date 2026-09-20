@@ -424,6 +424,8 @@ def main(argv: list[str] | None = None) -> int:
         result = {
             "output": str(args.output_manifest),
             "selectedPatients": sampled["selectedPatients"],
+            "consideredPatients": sampled["consideredPatients"],
+            "missingImages": sampled["missingImages"],
             "totalBytes": sampled["totalBytes"],
             "chexpertBytes": chexpert_bytes,
             "mimicBudgetBytes": mimic_budget,

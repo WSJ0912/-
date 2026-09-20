@@ -73,6 +73,9 @@ npm run dist
 - [Windows 构建](docs/WINDOWS_BUILD.md)
 - [10 周路线](docs/ROADMAP.md)
 - [发布门禁](docs/RELEASE_GATES.md)
+- [模型卡模板](docs/MODEL_CARD_TEMPLATE.md)
+- [发布人工检查单](docs/RELEASE_CHECKLIST.md)
+- [医生工作流评价](docs/CLINICIAN_REVIEW.md)
 - [第三方声明](third_party/NOTICE.md)
 
 ## 许可
