@@ -138,8 +138,8 @@ class ApiWorkflowTests(unittest.TestCase):
                 "/api/assistant/report",
                 headers=doctor_headers,
                 json={
-                    "observations": [],
-                    "review": {"Atelectasis": "denied"},
+                    "studyId": study_id,
+                    "reviewId": review.json()["reviewId"],
                     "clinicianText": "离线模板正文",
                 },
             )

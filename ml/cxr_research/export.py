@@ -14,7 +14,12 @@ def export_onnx(
     opset_version: int = 17,
     verify_input_shape: tuple[int, int, int, int] = (1, 1, 320, 320),
 ) -> Path:
-    """Export logits and feature maps; never substitutes a missing model."""
+    """Export logits, feature maps, and class activation maps.
+
+    The feature-map output is retained for backwards compatibility.  The
+    deployment service only advertises CAM support when the explicit ``cams``
+    output is present; a feature tensor alone is not a class explanation.
+    """
 
     try:
         import torch
@@ -23,15 +28,31 @@ def export_onnx(
     destination = Path(output_path)
     destination.parent.mkdir(parents=True, exist_ok=True)
     model.eval()
+
+    class DeploymentOutputs(torch.nn.Module):
+        def __init__(self, source: Any) -> None:
+            super().__init__()
+            self.source = source
+
+        def forward(self, image: Any) -> tuple[Any, Any, Any]:
+            logits, feature_map = self.source(image)
+            return logits, feature_map, self.source.cam(feature_map)
+
+    deployment_model = DeploymentOutputs(model).eval()
     example = torch.zeros(verify_input_shape, dtype=torch.float32)
     with torch.no_grad():
         torch.onnx.export(
-            model,
+            deployment_model,
             example,
             destination,
             input_names=["image"],
-            output_names=["logits", "cam_features"],
-            dynamic_axes={"image": {0: "batch"}, "logits": {0: "batch"}, "cam_features": {0: "batch"}},
+            output_names=["logits", "cam_features", "cams"],
+            dynamic_axes={
+                "image": {0: "batch"},
+                "logits": {0: "batch"},
+                "cam_features": {0: "batch"},
+                "cams": {0: "batch"},
+            },
             opset_version=opset_version,
             do_constant_folding=True,
             dynamo=False,
@@ -59,7 +80,8 @@ def verify_pytorch_onnx(
         torch_logits, _ = model(sample_tensor)
         torch_probabilities = torch.sigmoid(torch_logits).cpu().numpy()
     session = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
-    onnx_logits, _ = session.run(None, {session.get_inputs()[0].name: sample_tensor.cpu().numpy()})
+    onnx_outputs = session.run(None, {session.get_inputs()[0].name: sample_tensor.cpu().numpy()})
+    onnx_logits = onnx_outputs[0]
     onnx_probabilities = 1.0 / (1.0 + np.exp(-np.asarray(onnx_logits)))
     error = float(np.max(np.abs(torch_probabilities - onnx_probabilities)))
     return {"max_probability_error": error, "within_tolerance": bool(error <= tolerance)}

@@ -17,6 +17,8 @@
     "@cornerstonejs/core": "^5.10.7",
     "@cornerstonejs/dicom-image-loader": "^5.10.7",
     "@cornerstonejs/tools": "^5.10.7",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

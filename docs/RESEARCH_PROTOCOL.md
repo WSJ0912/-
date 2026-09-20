@@ -68,7 +68,7 @@ python -m cxr_research export-onnx `
   --package artifacts\cxr-mixstyle-0.1.0.medmodel
 ```
 
-示例中的 checkpoint 路径必须替换为选择记录中的真实最优候选。选择记录固定三份结果和 checkpoint 的 SHA-256；导出拒绝非最优候选、baseline、smoke checkpoint 或被修改的文件。ONNX 必须输出 `[N,14]` logits 和最后特征图，PyTorch/ONNX 概率最大误差必须不超过 `1e-4`。
+示例中的 checkpoint 路径必须替换为选择记录中的真实最优候选。选择记录固定三份结果和 checkpoint 的 SHA-256；导出拒绝非最优候选、baseline、smoke checkpoint 或被修改的文件。ONNX 必须输出 `[N,14]` logits、最后特征图和由分类器权重计算的 `[N,14,H,W]` 逐类 CAM，PyTorch/ONNX 概率最大误差必须不超过 `1e-4`。
 
 ## MIMIC 封存外部评价
 

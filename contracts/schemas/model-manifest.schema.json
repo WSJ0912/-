@@ -17,7 +17,7 @@
     "training": {"type": "object", "required": ["commit", "seeds", "method"], "additionalProperties": false, "properties": {"commit": {"type": "string", "minLength": 1}, "seeds": {"type": "array", "items": {"type": "integer"}, "minItems": 1}, "method": {"enum": ["baseline", "mixstyle"]}}},
     "dataSources": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
     "license": {"type": "string", "minLength": 1},
-    "files": {"type": "object", "required": ["model.onnx", "labels.json"], "minProperties": 2, "propertyNames": {"pattern": "^(?!.*(?:^|/)\\.\\.(?:/|$))(?!/)(?!.*\\\\).+$"}, "additionalProperties": {"type": "string", "pattern": "^[a-f0-9]{64}$"}},
+    "files": {"type": "object", "required": ["model.onnx", "labels.json"], "minProperties": 2, "properties": {"model.onnx": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "labels.json": {"type": "string", "pattern": "^[a-f0-9]{64}$"}}, "propertyNames": {"pattern": "^(?!.*(?:^|/)\\.\\.(?:/|$))(?!/)(?!.*\\\\).+$"}, "additionalProperties": {"type": "string", "pattern": "^[a-f0-9]{64}$"}},
     "modelSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
     "manifestSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
   }

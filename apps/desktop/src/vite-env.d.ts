@@ -7,9 +7,9 @@ interface Window {
     stageSelectedImages(): Promise<any[]>;
     selectModelPackage(): Promise<{ selectionId: string; name: string } | null>;
     installSelectedModel(selectionId: string): Promise<any>;
-    importExperiment(): Promise<any | null>;
+    importExperiment(): Promise<unknown | null>;
     exportReport(reportId: string, revision: number, suggestedName?: string): Promise<{ exported: boolean }>;
-    request(endpoint: string, method?: string, body?: unknown): Promise<any>;
+    request<T = any>(endpoint: string, method?: string, body?: unknown): Promise<T>;
     saveAssistantKey(value: string): Promise<boolean>;
     assistantKeyStatus(): Promise<{ configured: boolean }>;
   };

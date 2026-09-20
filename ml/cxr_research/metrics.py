@@ -52,6 +52,72 @@ def binary_auprc(y_true: Any, scores: Any, mask: Any | None = None) -> float | N
     return float(np.sum(recall_delta * precision))
 
 
+def binary_curve_points(
+    y_true: Any,
+    scores: Any,
+    mask: Any | None = None,
+) -> dict[str, list[dict[str, float | None]]]:
+    """Return aggregate ROC and precision-recall points without sample records."""
+
+    y, s = _valid_arrays(y_true, scores, mask)
+    positives = y == 1
+    negatives = y == 0
+    n_pos, n_neg = int(positives.sum()), int(negatives.sum())
+    if n_pos == 0 or n_neg == 0:
+        return {"roc": [], "pr": []}
+
+    order = np.argsort(-s, kind="mergesort")
+    sorted_scores = s[order]
+    sorted_positive = positives[order].astype(int)
+    last_for_score = np.r_[np.flatnonzero(np.diff(sorted_scores)), len(sorted_scores) - 1]
+    true_positives = np.cumsum(sorted_positive)[last_for_score]
+    false_positives = (last_for_score + 1) - true_positives
+    thresholds = sorted_scores[last_for_score]
+
+    roc: list[dict[str, float | None]] = [{"x": 0.0, "y": 0.0, "threshold": None}]
+    precision_recall: list[dict[str, float | None]] = [
+        {"x": 0.0, "y": 1.0, "threshold": None}
+    ]
+    for true_positive, false_positive, threshold in zip(
+        true_positives, false_positives, thresholds, strict=True
+    ):
+        recall = float(true_positive / n_pos)
+        roc.append(
+            {
+                "x": float(false_positive / n_neg),
+                "y": recall,
+                "threshold": float(threshold),
+            }
+        )
+        precision_recall.append(
+            {
+                "x": recall,
+                "y": float(true_positive / (true_positive + false_positive)),
+                "threshold": float(threshold),
+            }
+        )
+    return {"roc": roc, "pr": precision_recall}
+
+
+def multilabel_curve_points(
+    y_true: Any,
+    scores: Any,
+    labels: Sequence[str],
+    mask: Any | None = None,
+) -> dict[str, dict[str, list[dict[str, float | None]]]]:
+    """Build per-label aggregate curves; no prediction or patient rows are returned."""
+
+    y = np.asarray(y_true)
+    p = np.asarray(scores)
+    m = np.asarray(mask) if mask is not None else np.ones_like(y, dtype=bool)
+    if y.shape != p.shape or y.shape != m.shape or y.ndim != 2 or y.shape[1] != len(labels):
+        raise ValueError("y_true, scores, mask must be [N, number_of_labels]")
+    return {
+        label: binary_curve_points(y[:, index], p[:, index], m[:, index])
+        for index, label in enumerate(labels)
+    }
+
+
 def confusion_at_threshold(
     y_true: Any, scores: Any, threshold: float, mask: Any | None = None
 ) -> dict[str, float | int | None]:

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SetupRequest(BaseModel):
@@ -65,14 +65,27 @@ class ConfirmReportRequest(BaseModel):
 
 
 class AssistantReportRequest(BaseModel):
-    observations: list[dict[str, Any]]
-    review: dict[str, Any]
+    model_config = ConfigDict(extra="forbid")
+
+    # Optional only for the legacy offline fallback. Online requests and all
+    # new clients must identify the local study so context can be loaded here.
+    studyId: str | None = None
+    reviewId: str | None = None
     clinicianText: str = Field(default="", max_length=20000)
+
+
+class MetricInterval(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    estimate: float | None
+    lower: float | None
+    upper: float | None
+    n: int = Field(ge=0)
 
 
 class AssistantExperimentRequest(BaseModel):
     aggregateMetrics: dict[str, float | None]
-    perClassMetrics: dict[str, dict[str, float | None]]
+    perClassMetrics: dict[str, dict[str, float | None | MetricInterval]]
     experimentNotes: str = Field(default="", max_length=20000)
 
 

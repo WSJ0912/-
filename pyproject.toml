@@ -13,6 +13,7 @@ authors = [{ name = "Medical Imaging Platform contributors" }]
 dependencies = [
   "numpy>=1.24",
   "pydantic>=2.5",
+  "jsonschema>=4.21",
 ]
 
 [project.optional-dependencies]
@@ -37,7 +38,6 @@ service = [
 dev = [
   "pytest>=8.0",
   "ruff>=0.4",
-  "jsonschema>=4.21",
   "httpx>=0.27",
 ]
 build = [

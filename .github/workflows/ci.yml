@@ -3,29 +3,60 @@ name: validation
 on:
   push:
     branches: [main, "codex/**"]
+    tags: ["v*"]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  python:
-    runs-on: ubuntu-latest
+  stable-release-gate:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Block stable release until real-world gates pass
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Stable releases are blocked: the real-data, target-hardware, clinician-review, and code-signing gates in docs/RELEASE_GATES.md are not complete."
+            exit 1
+          fi
+          echo "Prerelease tag detected; stable-release gate not applicable."
+
+  python:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
       - run: python -m pip install -e ".[dev,ml,service]"
+      - run: python scripts/generate-contracts.py --check
       - run: python -m unittest discover -s tests/python -v
       - run: python -m compileall -q ml services tests/python scripts
       - run: python -m ruff check ml services tests/python scripts
 
   desktop:
-    runs-on: windows-latest
+    runs-on: windows-2025
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: apps/desktop
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
           cache: npm

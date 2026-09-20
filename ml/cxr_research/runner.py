@@ -14,7 +14,7 @@ from .data import CheXpertDataset, CheXpertRecord, records_to_arrays
 from .labels import CHEXPERT_LABELS, PRIMARY_LABELS
 from .losses import capped_inverse_prevalence
 from .manifests import read_chexpert_split_manifest
-from .metrics import add_patient_bootstrap_intervals, evaluate_multilabel
+from .metrics import add_patient_bootstrap_intervals, evaluate_multilabel, multilabel_curve_points
 from .model import build_model
 from .thresholds import select_thresholds
 from .training import TrainingConfig, predict_loader, seed_everything, train_epoch
@@ -174,6 +174,9 @@ def run_training(
         "thresholds": thresholds,
         "history": history,
         "testMetrics": test_metrics,
+        "curves": multilabel_curve_points(
+            test_targets, test_probabilities, CHEXPERT_LABELS, test_mask
+        ),
     }
     _json(output / "result.json", summary)
     _json(output / "thresholds.json", thresholds)
@@ -212,6 +215,24 @@ def aggregate_experiment(
                 observations = [result["testMetrics"]["per_class"][label][metric] for result in run_results if result["method"] == method]
                 numeric = [float(value) for value in observations if value is not None]
                 per_class[label][f"{method}_{metric}_mean"] = float(np.mean(numeric)) if numeric else None
+    curves: dict[str, dict[str, Any]] = {}
+    for result in run_results:
+        result_curves = result.get("curves")
+        if not isinstance(result_curves, Mapping):
+            continue
+        method = str(result["method"])
+        seed = int(result["seed"])
+        for label_index, label in enumerate(CHEXPERT_LABELS):
+            curve = result_curves.get(label)
+            if not isinstance(curve, Mapping):
+                continue
+            curves[f"{method}-seed-{seed}-label-{label_index}"] = {
+                "label": label,
+                "method": method,
+                "seed": seed,
+                "roc": list(curve.get("roc", [])),
+                "pr": list(curve.get("pr", [])),
+            }
     bundle = {
         "schemaVersion": "medexperiment-1",
         "experimentId": experiment_id,
@@ -220,7 +241,7 @@ def aggregate_experiment(
         "datasetManifestSha256": dataset_manifest_sha256,
         "aggregateMetrics": aggregate,
         "perClassMetrics": per_class,
-        "curves": {},
+        "curves": curves,
         "modelCard": {"intendedUse": "adult AP/PA chest radiograph research prototype", "limitations": ["not a medical device", "not an independent diagnosis", "external MIMIC evaluation must remain sealed until final evaluation"]},
     }
     return build_medexperiment(bundle, output_path)

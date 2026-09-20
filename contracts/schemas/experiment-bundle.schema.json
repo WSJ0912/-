@@ -5,15 +5,103 @@
   "type": "object",
   "required": ["schemaVersion", "experimentId", "config", "seeds", "datasetManifestSha256", "aggregateMetrics", "perClassMetrics", "curves", "modelCard"],
   "additionalProperties": false,
+  "$defs": {
+    "configValue": {
+      "oneOf": [
+        {"type": "string"},
+        {"type": "number"},
+        {"type": "boolean"},
+        {"type": "null"},
+        {
+          "type": "array",
+          "items": {"type": ["string", "number", "boolean", "null"]}
+        }
+      ]
+    },
+    "metricInterval": {
+      "type": "object",
+      "required": ["estimate", "lower", "upper", "n"],
+      "additionalProperties": false,
+      "properties": {
+        "estimate": {"type": ["number", "null"]},
+        "lower": {"type": ["number", "null"]},
+        "upper": {"type": ["number", "null"]},
+        "n": {"type": "integer", "minimum": 0}
+      }
+    },
+    "metricValue": {
+      "oneOf": [
+        {"type": "number"},
+        {"type": "null"},
+        {"$ref": "#/$defs/metricInterval"}
+      ]
+    },
+    "curvePoint": {
+      "type": "object",
+      "required": ["x", "y"],
+      "additionalProperties": false,
+      "properties": {
+        "x": {"type": "number", "minimum": 0, "maximum": 1},
+        "y": {"type": "number", "minimum": 0, "maximum": 1},
+        "threshold": {"type": ["number", "null"], "minimum": 0, "maximum": 1}
+      }
+    },
+    "curveSeries": {
+      "type": "object",
+      "required": ["label", "method", "seed", "roc", "pr"],
+      "additionalProperties": false,
+      "properties": {
+        "label": {"enum": ["Atelectasis", "Cardiomegaly", "Consolidation", "Edema", "Enlarged Cardiomediastinum", "Fracture", "Lung Lesion", "Lung Opacity", "No Finding", "Pleural Effusion", "Pleural Other", "Pneumonia", "Pneumothorax", "Support Devices"]},
+        "method": {"enum": ["baseline", "mixstyle"]},
+        "seed": {"type": "integer"},
+        "roc": {"type": "array", "items": {"$ref": "#/$defs/curvePoint"}},
+        "pr": {"type": "array", "items": {"$ref": "#/$defs/curvePoint"}}
+      }
+    },
+    "modelCardValue": {
+      "oneOf": [
+        {"type": "string"},
+        {"type": "array", "items": {"type": "string"}}
+      ]
+    }
+  },
   "properties": {
     "schemaVersion": {"const": "medexperiment-1"},
     "experimentId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"},
-    "config": {"type": "object"},
-    "seeds": {"type": "array", "items": {"type": "integer"}, "minItems": 1},
+    "config": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,79}$"},
+      "additionalProperties": {"$ref": "#/$defs/configValue"}
+    },
+    "seeds": {"type": "array", "items": {"type": "integer"}, "minItems": 1, "uniqueItems": true},
     "datasetManifestSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
-    "aggregateMetrics": {"type": "object", "additionalProperties": {"type": ["number", "null"]}},
-    "perClassMetrics": {"type": "object", "additionalProperties": {"type": "object", "additionalProperties": {"type": ["number", "null"]}}},
-    "curves": {"type": "object"},
-    "modelCard": {"type": "object"}
+    "aggregateMetrics": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,79}$"},
+      "additionalProperties": {"type": ["number", "null"]}
+    },
+    "perClassMetrics": {
+      "type": "object",
+      "propertyNames": {"enum": ["Atelectasis", "Cardiomegaly", "Consolidation", "Edema", "Enlarged Cardiomediastinum", "Fracture", "Lung Lesion", "Lung Opacity", "No Finding", "Pleural Effusion", "Pleural Other", "Pneumonia", "Pneumothorax", "Support Devices"]},
+      "additionalProperties": {
+        "type": "object",
+        "propertyNames": {"pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,79}$"},
+        "additionalProperties": {"$ref": "#/$defs/metricValue"}
+      }
+    },
+    "curves": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$"},
+      "additionalProperties": {"$ref": "#/$defs/curveSeries"}
+    },
+    "modelCard": {
+      "type": "object",
+      "properties": {
+        "intendedUse": {"type": "string"},
+        "limitations": {"type": "array", "items": {"type": "string"}}
+      },
+      "propertyNames": {"pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,79}$"},
+      "additionalProperties": {"$ref": "#/$defs/modelCardValue"}
+    }
   }
 }

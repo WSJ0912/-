@@ -48,6 +48,10 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(outputs[1].shape[0], 1)
         self.assertEqual(outputs[1].shape[1], model.classifier.in_features)
         self.assertGreater(outputs[1].shape[-1], 1)
+        self.assertEqual(outputs[2].shape[0], 1)
+        self.assertEqual(outputs[2].shape[1], len(CHEXPERT_LABELS))
+        self.assertEqual(outputs[2].shape[-2:], outputs[1].shape[-2:])
+        self.assertTrue((outputs[2] >= 0).all())
 
 
 if __name__ == "__main__":

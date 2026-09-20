@@ -10,7 +10,7 @@
 | E-02 | Electron main/preload/IPC policy 语法、TypeScript、Vite build 通过 | PASS（2026-09-19 本地候选构建） |
 | E-03 | `npm audit --audit-level=low` 无已知漏洞 | PASS（2026-09-19，0 个已知漏洞） |
 | E-04 | `.medmodel` 固定 14 输出、全部哈希、ZIP 路径安全 | PASS（自动化测试） |
-| E-05 | PyTorch/ONNX 概率最大误差 `<=1e-4`，logits 与特征图形状正确 | PASS（随机初始化真实 DenseNet 回归测试） |
+| E-05 | PyTorch/ONNX 概率最大误差 `<=1e-4`，logits、特征图与 14 类 CAM 形状正确 | PASS（随机初始化真实 DenseNet 回归测试；不代表医学合理性验证） |
 | E-06 | 导入、匿名化、真实 ONNX Runtime、复核、报告锁定、中文 PDF | PASS（合成工作流 API 测试） |
 | E-07 | 新 NSIS 安装包构建成功并包含 `resources/legal` | PASS（2026-09-19，本地候选构建、开发机静默安装/卸载及内嵌服务工作流验证） |
 | E-08 | Git diff 无空白错误，仓库不含数据、权重、密钥、数据库或构建物 | PASS（2026-09-19 提交前扫描；推送前再次检查） |
@@ -43,6 +43,7 @@
 - 可以在工程门禁通过后推送源码，明确标记为科研原型并列出未完成门禁。
 - 不得在 R-01 至 R-07 未完成时发布真实性能结论或医学模型权重。
 - 不得在 W-01、W-02 和 W-06 未完成时把 NSIS 资产标记为正式稳定发行版。
+- 当前 Actions 会让严格稳定 SemVer 标签（含 build metadata）校验失败；仓库还必须用 GitHub ruleset 要求该检查并限制 Release 创建，单独的 workflow 红灯不能阻止手工发布。
 - `v0.1.0` Release 创建前，由维护者在本文件记录证据链接、日期和执行人；不能用合成测试替代真实数据、目标硬件或医生评价。
 
 2026-09-19 本地候选安装包仅用于工程验证，未提交到 Git、未作为 Release 发布。其 SHA-256 为 `276E8578DFFA79711CBB6046EAE1F00543DA6247E3AF512C3302640C866E7972`；任何重建都会改变该哈希，发布时必须重新记录。

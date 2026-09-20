@@ -10,7 +10,7 @@
 - ImageNet DenseNet-121 基线与唯一改进 MixStyle（`p=0.5`、`alpha=0.1`），固定 3 个种子、最多 15 轮和六次正式运行协议。
 - MIMIC 固定种子抽样、20 GiB 总空间预算、SHA-256 封存和聚合-only 外部评价。
 - 每类 AUROC、AUPRC、敏感度、特异度、F1、Brier，以及患者级 bootstrap 95% 置信区间。
-- 强制验证集最优 MixStyle 部署选择、ONNX logits/特征图导出及 `1e-4` 概率一致性门禁。
+- 强制验证集最优 MixStyle 部署选择、ONNX logits/特征图/逐类 CAM 导出及 `1e-4` 概率一致性门禁。
 - `.medmodel` / `.medexperiment` 清单、文件哈希、固定标签和 ZIP 路径安全校验。
 - 本地随机端口、双令牌、Argon2id、角色权限、SQLite、DICOM 去标识化、烧录文字遮挡和 EXIF 清理。
 - 检查队列、Cornerstone3D 阅片、14 项医生复核、报告版本/PDF、实验结果、模型管理和管理员设置。

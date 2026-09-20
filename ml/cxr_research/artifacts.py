@@ -7,9 +7,18 @@ import zipfile
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 
-from .labels import CHEXPERT_LABELS, validate_label_order
+from jsonschema import Draft202012Validator, FormatChecker
+
+from .labels import CHEXPERT_LABELS, CONTRACT_SCHEMAS, validate_label_order
 
 SAFE_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$")
+_FORMAT_CHECKER = FormatChecker()
+_CONTRACT_VALIDATORS: dict[str, Draft202012Validator] = {}
+for _schema_name, _schema in CONTRACT_SCHEMAS.items():
+    Draft202012Validator.check_schema(_schema)
+    _CONTRACT_VALIDATORS[_schema_name] = Draft202012Validator(
+        _schema, format_checker=_FORMAT_CHECKER
+    )
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -25,7 +34,13 @@ def sha256_file(path: str | Path) -> str:
 
 
 def canonical_json(value: Any) -> bytes:
-    return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return json.dumps(
+        value,
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
 
 
 def model_manifest_sha256(manifest: Mapping[str, Any]) -> str:
@@ -63,7 +78,37 @@ def _validate_identifier(value: Any, field: str) -> str:
     return identifier
 
 
+def _reject_nonfinite_json(value: str) -> None:
+    raise ValueError(f"non-finite JSON number is not allowed: {value}")
+
+
+def _load_json(value: str | bytes) -> Any:
+    return json.loads(value, parse_constant=_reject_nonfinite_json)
+
+
+def _validation_path(parts: Any) -> str:
+    path = "$"
+    for part in parts:
+        path += f"[{part}]" if isinstance(part, int) else f".{part}"
+    return path
+
+
+def _validate_contract(schema_name: str, value: Any) -> None:
+    validator = _CONTRACT_VALIDATORS[schema_name]
+    errors = sorted(
+        validator.iter_errors(value),
+        key=lambda error: tuple(str(part) for part in error.absolute_path),
+    )
+    if errors:
+        first = errors[0]
+        raise ValueError(
+            f"{schema_name} schema validation failed at "
+            f"{_validation_path(first.absolute_path)}: {first.message}"
+        )
+
+
 def validate_model_manifest(manifest: Mapping[str, Any]) -> None:
+    _validate_contract("model-manifest", manifest)
     required = {
         "schemaVersion",
         "modelId",
@@ -132,6 +177,7 @@ def validate_model_manifest(manifest: Mapping[str, Any]) -> None:
 
 
 def validate_experiment_bundle(bundle: Mapping[str, Any]) -> None:
+    _validate_contract("experiment-bundle", bundle)
     required = {"schemaVersion", "experimentId", "config", "seeds", "datasetManifestSha256", "aggregateMetrics", "perClassMetrics", "curves", "modelCard"}
     missing = required - set(bundle)
     if missing:
@@ -162,7 +208,7 @@ def build_medmodel(source_dir: str | Path, output_path: str | Path) -> Path:
     manifest_path = source / "manifest.json"
     if not manifest_path.is_file() or not (source / "model.onnx").is_file():
         raise FileNotFoundError("a .medmodel source must contain manifest.json and model.onnx")
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest = _load_json(manifest_path.read_text(encoding="utf-8"))
     validate_model_manifest(manifest)
     for relative, expected in manifest["files"].items():
         file_path = source / relative
@@ -179,8 +225,8 @@ def build_medmodel(source_dir: str | Path, output_path: str | Path) -> Path:
 def read_medmodel_manifest(package_path: str | Path) -> dict[str, Any]:
     with zipfile.ZipFile(package_path, "r") as archive:
         try:
-            manifest = json.loads(archive.read("manifest.json"))
-        except (KeyError, json.JSONDecodeError) as exc:
+            manifest = _load_json(archive.read("manifest.json"))
+        except (KeyError, json.JSONDecodeError, ValueError) as exc:
             raise ValueError("invalid .medmodel: manifest.json is missing or malformed") from exc
         validate_model_manifest(manifest)
         expected_names = {"manifest.json", *manifest["files"].keys()}
@@ -202,8 +248,8 @@ def read_medmodel_manifest(package_path: str | Path) -> dict[str, Any]:
             if actual != expected:
                 raise ValueError(f"invalid .medmodel: hash mismatch for {relative}")
         try:
-            label_dictionary = json.loads(archive.read("labels.json"))
-        except (KeyError, json.JSONDecodeError) as exc:
+            label_dictionary = _load_json(archive.read("labels.json"))
+        except (KeyError, json.JSONDecodeError, ValueError) as exc:
             raise ValueError("invalid .medmodel: labels.json is missing or malformed") from exc
         labels = label_dictionary.get("labels") if isinstance(label_dictionary, Mapping) else None
         if tuple(labels or ()) != CHEXPERT_LABELS:
@@ -222,7 +268,10 @@ def build_medexperiment(
     destination = Path(output_path)
     destination.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("experiment.json", json.dumps(bundle, ensure_ascii=False, indent=2) + "\n")
+        archive.writestr(
+            "experiment.json",
+            json.dumps(bundle, ensure_ascii=False, indent=2, allow_nan=False) + "\n",
+        )
         for relative, path in (extra_files or {}).items():
             try:
                 normalized = _safe_archive_name(relative)
@@ -259,8 +308,8 @@ def read_medexperiment(package_path: str | Path) -> dict[str, Any]:
     except (zipfile.BadZipFile, KeyError) as exc:
         raise ValueError("invalid .medexperiment package") from exc
     try:
-        bundle = json.loads(raw)
-    except json.JSONDecodeError as exc:
+        bundle = _load_json(raw)
+    except (json.JSONDecodeError, ValueError) as exc:
         raise ValueError("invalid .medexperiment experiment.json") from exc
     validate_experiment_bundle(bundle)
     return bundle

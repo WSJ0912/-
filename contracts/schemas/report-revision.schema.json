@@ -5,14 +5,19 @@
   "required": ["reportId", "studyId", "revision", "authorId", "createdAt", "body", "status"],
   "additionalProperties": false,
   "properties": {
-    "reportId": {"type": "string", "minLength": 1},
-    "studyId": {"type": "string", "minLength": 1},
+    "reportId": {"type": "string", "pattern": "^RPT-[A-Z0-9-]+$"},
+    "studyId": {"type": "string", "pattern": "^ST-[A-Z0-9-]+$"},
     "revision": {"type": "integer", "minimum": 1},
-    "authorId": {"type": "string", "minLength": 1},
+    "authorId": {"type": "string", "pattern": "^USR-[A-Z0-9-]+$"},
     "createdAt": {"type": "string", "format": "date-time"},
     "body": {"type": "string", "maxLength": 50000},
     "status": {"enum": ["draft", "confirmed"]},
-    "confirmedAt": {"type": "string", "format": "date-time"},
-    "reviewId": {"type": "string"}
+    "confirmedAt": {"type": ["string", "null"], "format": "date-time"},
+    "reviewId": {
+      "oneOf": [
+        {"type": "string", "pattern": "^REV-[A-Z0-9-]+$"},
+        {"type": "null"}
+      ]
+    }
   }
 }

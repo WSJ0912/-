@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import shutil
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -59,9 +60,7 @@ class PlatformCore:
         return {key: value for key, value in study.items() if key not in private_fields}
 
     def create_initial_admin(self, username: str, password: str) -> str:
-        if self.database.user_count() != 0:
-            raise PermissionError("initial administrator already exists")
-        return self.database.create_user(username, Role.ADMIN.value, hash_password(password))
+        return self.database.create_initial_admin(username, hash_password(password))
 
     def authenticate(self, username: str, password: str) -> UserSession:
         user = self.database.find_user(username)
@@ -231,6 +230,69 @@ class PlatformCore:
         require_permission(actor.role, "manage_models")
         return self.models.install(package_path)
 
+    def _active_model_manifest(self) -> Mapping[str, Any] | None:
+        active = getattr(self.models, "active", None)
+        manifest = getattr(active, "manifest", None)
+        if isinstance(manifest, Mapping):
+            return manifest
+        status = self.models.status()
+        required = {
+            "modelId",
+            "version",
+            "modelSha256",
+            "manifestSha256",
+            "labels",
+        }
+        return status if required.issubset(status) else None
+
+    @staticmethod
+    def _normalize_cams(value: Any) -> list[dict[str, Any]]:
+        try:
+            cams = np.asarray(value, dtype=np.float32)
+        except (TypeError, ValueError):
+            return []
+        if cams.ndim == 4 and cams.shape[0] == 1:
+            cams = cams[0]
+        if cams.ndim != 3:
+            return []
+        if cams.shape[0] == len(CHEXPERT_LABELS):
+            class_maps = cams
+        elif cams.shape[-1] == len(CHEXPERT_LABELS):
+            class_maps = np.moveaxis(cams, -1, 0)
+        else:
+            # Current exported models return feature maps. Those are not class
+            # activation maps and must not be presented as explanations.
+            return []
+
+        records: list[dict[str, Any]] = []
+        for label, raw_map in zip(CHEXPERT_LABELS, class_maps, strict=True):
+            values = np.nan_to_num(
+                np.asarray(raw_map, dtype=np.float32),
+                nan=0.0,
+                posinf=0.0,
+                neginf=0.0,
+            )
+            if values.ndim != 2 or values.shape[0] == 0 or values.shape[1] == 0:
+                return []
+            low = float(values.min())
+            high = float(values.max())
+            if high > low:
+                values = (values - low) / (high - low)
+            else:
+                values = np.zeros_like(values)
+            pixels = np.round(values * 255.0).astype(np.uint8).tobytes()
+            height, width = values.shape
+            records.append(
+                {
+                    "label": label,
+                    "width": int(width),
+                    "height": int(height),
+                    "pixels": pixels,
+                    "sha256": hashlib.sha256(pixels).hexdigest(),
+                }
+            )
+        return records
+
     def infer(self, actor: UserSession, study_id: str) -> dict[str, Any]:
         require_permission(actor.role, "infer")
         study = self.database.get_study(study_id)
@@ -238,11 +300,27 @@ class PlatformCore:
             raise FileNotFoundError("study not found")
         if study["status"] not in {"ready", "reviewed"} or study["viewPosition"] not in {"AP", "PA"} or not study["adultConfirmed"]:
             raise ValueError("study is not eligible for inference")
+        manifest_hint = self._active_model_manifest()
+        if manifest_hint is not None:
+            validate_label_order(tuple(manifest_hint["labels"]))
+            reusable = self.database.reusable_prediction(
+                study_id,
+                str(manifest_hint["modelId"]),
+                str(manifest_hint["version"]),
+                str(manifest_hint["modelSha256"]),
+                str(manifest_hint["manifestSha256"]),
+            )
+            if reusable is not None:
+                return reusable
         image = preprocess_for_model(study["deidentifiedPath"])
-        logits_batch, features, manifest = self.models.predict(image)
+        logits_batch, cams, manifest = self.models.predict(image)
         validate_label_order(tuple(manifest["labels"]))
-        logits = np.asarray(logits_batch, dtype=float)[0]
+        logits_array = np.asarray(logits_batch, dtype=float)
+        if logits_array.ndim != 2 or logits_array.shape != (1, len(CHEXPERT_LABELS)):
+            raise RuntimeError("ONNX model returned an invalid logits shape")
+        logits = logits_array[0]
         probabilities = 1.0 / (1.0 + np.exp(-logits))
+        cam_records = self._normalize_cams(cams)
         prediction = {
             "predictionId": new_id("PRD"),
             "studyId": study_id,
@@ -254,11 +332,34 @@ class PlatformCore:
             "probabilities": {label: float(probabilities[index]) for index, label in enumerate(CHEXPERT_LABELS)},
             "logits": {label: float(logits[index]) for index, label in enumerate(CHEXPERT_LABELS)},
             "thresholds": dict(manifest.get("thresholds", {})),
-            "camAvailable": bool(np.asarray(features).size),
+            "camAvailable": len(cam_records) == len(CHEXPERT_LABELS),
             "source": "onnx",
         }
-        self.database.save_prediction(prediction)
-        return prediction
+        return self.database.save_prediction(prediction, cam_records)
+
+    def prediction_cam(
+        self, actor: UserSession, prediction_id: str, label_index: int
+    ) -> dict[str, Any]:
+        require_permission(actor.role, "review")
+        if label_index < 0 or label_index >= len(CHEXPERT_LABELS):
+            raise ValueError("CAM label index is out of range")
+        if self.database.get_prediction(prediction_id) is None:
+            raise FileNotFoundError("prediction not found")
+        label = CHEXPERT_LABELS[label_index]
+        cam = self.database.get_prediction_cam(prediction_id, label)
+        if cam is None:
+            raise FileNotFoundError("prediction CAM not found")
+        pixels = bytes(cam["pixels"])
+        digest = hashlib.sha256(pixels).hexdigest()
+        if digest != cam["sha256"]:
+            raise RuntimeError("stored CAM failed its integrity check")
+        return {
+            "label": label,
+            "width": cam["width"],
+            "height": cam["height"],
+            "pixelsBase64": base64.b64encode(pixels).decode("ascii"),
+            "sha256": digest,
+        }
 
     def save_review(
         self,
@@ -299,6 +400,13 @@ class PlatformCore:
         require_permission(actor.role, "report")
         if self.database.get_study(study_id) is None:
             raise FileNotFoundError("study not found")
+        report_id = report_id or new_id("RPT")
+        header = self.database.get_report_record(report_id)
+        if header is not None:
+            if header["ownerId"] != actor.user_id:
+                raise PermissionError("report belongs to another doctor")
+            if header["studyId"] != study_id:
+                raise ValueError("report revisions cannot change study")
         if review_id is None:
             latest_review = self.database.latest_review(study_id, actor.user_id)
             review_id = latest_review["reviewId"] if latest_review else None
@@ -306,56 +414,133 @@ class PlatformCore:
             raise FileNotFoundError("review not found")
         elif review["studyId"] != study_id or review["doctorId"] != actor.user_id:
             raise PermissionError("report review must belong to this study and doctor")
-        report_id = report_id or new_id("RPT")
-        latest = self.database.latest_report(report_id)
-        if latest and latest["studyId"] != study_id:
-            raise ValueError("report revisions cannot change study")
-        if latest and latest["status"] == "confirmed":
-            raise ValueError("confirmed report is locked; create a new report instead")
-        revision = int(latest["revision"]) + 1 if latest else 1
-        report = {
-            "reportId": report_id,
-            "studyId": study_id,
-            "revision": revision,
-            "authorId": actor.user_id,
-            "createdAt": utc_now(),
-            "body": body,
-            "status": "draft",
-            "reviewId": review_id,
-        }
-        self.database.save_report_revision(report)
-        return report
+        return self.database.append_report_revision(
+            report_id,
+            study_id,
+            actor.user_id,
+            body,
+            review_id,
+            utc_now(),
+        )
+
+    def list_reports(self, actor: UserSession) -> list[dict[str, Any]]:
+        require_permission(actor.role, "report")
+        return self.database.list_reports(actor.user_id)
+
+    def report_history(
+        self, actor: UserSession, report_id: str
+    ) -> list[dict[str, Any]]:
+        require_permission(actor.role, "report")
+        self._require_report_owner(actor, report_id)
+        return self.database.list_report_revisions(report_id, actor.user_id)
+
+    def _require_report_owner(
+        self, actor: UserSession, report_id: str
+    ) -> dict[str, Any]:
+        header = self.database.get_report_record(report_id)
+        if header is None:
+            raise FileNotFoundError("report not found")
+        if header["ownerId"] != actor.user_id:
+            raise PermissionError("report belongs to another doctor")
+        return header
 
     def confirm_report(self, actor: UserSession, report_id: str, revision: int) -> dict[str, Any]:
         require_permission(actor.role, "confirm_report")
-        report = self.database.get_report(report_id, revision)
+        self._require_report_owner(actor, report_id)
+        report = self.database.get_report(report_id, revision, actor.user_id)
         if report is None:
             raise FileNotFoundError("report revision not found")
-        if report["authorId"] != actor.user_id:
-            raise PermissionError("only the doctor who authored this revision may confirm it")
-        self.database.confirm_report(report_id, revision)
-        confirmed = self.database.get_report(report_id, revision)
+        if not report.get("reviewId"):
+            raise ValueError("report must reference a doctor review before confirmation")
+        self.database.confirm_report(
+            report_id, revision, owner_id=actor.user_id
+        )
+        confirmed = self.database.get_report(report_id, revision, actor.user_id)
         assert confirmed is not None
         return confirmed
 
     def export_report(self, actor: UserSession, report_id: str, revision: int, output_path: str) -> str:
         require_permission(actor.role, "report")
-        report = self.database.get_report(report_id, revision)
-        if report is None or report["status"] != "confirmed":
+        self._require_report_owner(actor, report_id)
+        report = self.database.get_report(report_id, revision, actor.user_id)
+        if report is None:
+            raise FileNotFoundError("report revision not found")
+        if report["status"] != "confirmed":
             raise ValueError("only a confirmed report revision can be exported")
-        review = self.database.get_review(report["reviewId"]) if report.get("reviewId") else None
-        if review is not None:
-            prediction = self.database.get_prediction(review["predictionId"])
-        else:
-            prediction_row = self.database.latest_prediction(report["studyId"])
-            prediction = (
-                self.database.get_prediction(str(prediction_row["prediction_id"]))
-                if prediction_row is not None
-                else None
-            )
+        if not report.get("reviewId"):
+            raise ValueError("confirmed report has no pinned doctor review")
+        review = self.database.get_review(report["reviewId"])
+        if review is None:
+            raise ValueError("confirmed report review is unavailable")
+        prediction = self.database.get_prediction(review["predictionId"])
         if prediction is None:
             raise ValueError("report has no AI prediction appendix")
         return str(export_report_pdf(output_path, report, prediction, review))
+
+    def build_report_assistant_context(
+        self,
+        actor: UserSession,
+        study_id: str,
+        clinician_text: str,
+        review_id: str | None = None,
+    ) -> dict[str, Any]:
+        require_permission(actor.role, "assistant")
+        if self.database.get_study(study_id) is None:
+            raise FileNotFoundError("study not found")
+        if review_id is None:
+            review = self.database.latest_review(study_id, actor.user_id)
+        else:
+            review = self.database.get_review(review_id)
+            if review is None:
+                raise FileNotFoundError("review not found")
+            if review["studyId"] != study_id or review["doctorId"] != actor.user_id:
+                raise PermissionError("assistant review must belong to this study and doctor")
+
+        prediction: dict[str, Any] | None = None
+        if review is not None:
+            prediction = self.database.get_prediction(review["predictionId"])
+        else:
+            prediction_row = self.database.latest_prediction(study_id)
+            if prediction_row is not None:
+                prediction = self.database.get_prediction(
+                    str(prediction_row["prediction_id"])
+                )
+        if prediction is not None and prediction["studyId"] != study_id:
+            raise ValueError("assistant prediction does not belong to the study")
+
+        decisions = dict(review["decisions"]) if review is not None else {}
+        observations = []
+        if prediction is not None:
+            for label in CHEXPERT_LABELS:
+                observations.append(
+                    {
+                        "label": label,
+                        "probability": prediction["probabilities"].get(label),
+                        "threshold": prediction["thresholds"].get(label),
+                        "decision": decisions.get(label),
+                    }
+                )
+        return {
+            "observations": observations,
+            "review": {
+                "decisions": decisions,
+                "notes": review["notes"] if review is not None else "",
+            },
+            "clinicianText": clinician_text,
+        }
+
+    def assistant_report(
+        self,
+        actor: UserSession,
+        study_id: str,
+        clinician_text: str,
+        review_id: str | None = None,
+        assistant: OpenAIAssistant | None = None,
+    ) -> dict[str, Any]:
+        payload = self.build_report_assistant_context(
+            actor, study_id, clinician_text, review_id
+        )
+        return (assistant or self.assistant).report_draft(payload)
 
     def import_experiment(self, actor: UserSession, package_path: str) -> dict[str, Any]:
         require_permission(actor.role, "experiment")

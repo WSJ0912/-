@@ -43,19 +43,29 @@ def build_synthetic_medmodel(root: Path) -> Path:
         TensorProto.FLOAT,
         [1, 1, 10, 10],
     )
+    cams_info = helper.make_tensor_value_info(
+        "cams",
+        TensorProto.FLOAT,
+        [1, 14, 10, 10],
+    )
     logits = numpy_helper.from_array(np.zeros((1, 14), dtype=np.float32), "logits_value")
     features = numpy_helper.from_array(
         np.ones((1, 1, 10, 10), dtype=np.float32),
         "features_value",
     )
+    cam_values = np.stack(
+        [np.arange(100, dtype=np.float32).reshape(10, 10) + index for index in range(14)]
+    )[None, ...]
+    cams = numpy_helper.from_array(cam_values, "cams_value")
     graph = helper.make_graph(
         [
             helper.make_node("Constant", [], ["logits"], value=logits),
             helper.make_node("Constant", [], ["cam_features"], value=features),
+            helper.make_node("Constant", [], ["cams"], value=cams),
         ],
         "synthetic-test-only-cxr",
         [input_info],
-        [logits_info, features_info],
+        [logits_info, features_info, cams_info],
     )
     model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 17)])
     model.ir_version = 10

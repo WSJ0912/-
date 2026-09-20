@@ -167,6 +167,16 @@ def create_app(root: str | Path = "./runtime") -> Any:
     def predict(study_id: str, session: UserSession = Depends(permission("infer"))) -> dict[str, Any]:
         return operation(lambda: core.infer(session, study_id))
 
+    @app.get("/api/predictions/{prediction_id}/cams/{label_index}")
+    def prediction_cam(
+        prediction_id: str,
+        label_index: int,
+        session: UserSession = Depends(permission("review")),
+    ) -> dict[str, Any]:
+        return operation(
+            lambda: core.prediction_cam(session, prediction_id, label_index)
+        )
+
     @app.post("/api/reviews")
     def review(request: ReviewRequest, session: UserSession = Depends(permission("review"))) -> dict[str, Any]:
         return operation(lambda: core.save_review(session, request.studyId, request.predictionId, request.decisions, request.notes))
@@ -174,6 +184,19 @@ def create_app(root: str | Path = "./runtime") -> Any:
     @app.post("/api/reports/draft")
     def report_draft(request: ReportDraftRequest, session: UserSession = Depends(permission("report"))) -> dict[str, Any]:
         return operation(lambda: core.save_report_draft(session, request.studyId, request.body, request.reportId, request.reviewId))
+
+    @app.get("/api/reports")
+    def reports(
+        session: UserSession = Depends(permission("report")),
+    ) -> list[dict[str, Any]]:
+        return operation(lambda: core.list_reports(session))
+
+    @app.get("/api/reports/{report_id}/revisions")
+    def report_revisions(
+        report_id: str,
+        session: UserSession = Depends(permission("report")),
+    ) -> list[dict[str, Any]]:
+        return operation(lambda: core.report_history(session, report_id))
 
     @app.post("/api/reports/confirm")
     def report_confirm(request: ConfirmReportRequest, session: UserSession = Depends(permission("confirm_report"))) -> dict[str, Any]:
@@ -193,12 +216,40 @@ def create_app(root: str | Path = "./runtime") -> Any:
         session: UserSession = Depends(permission("assistant")),
         x_assistant_key: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        payload = {"observations": request.observations, "review": request.review, "clinicianText": request.clinicianText}
-        try:
-            return OpenAIAssistant(api_key=x_assistant_key).report_draft(payload)
-        except RuntimeError as exc:
-            # Offline mode remains useful without pretending an LLM ran.
-            return {"draft": request.clinicianText, "cautions": [str(exc), "本结果为离线草稿，必须由医生编辑并确认"]}
+        assistant = OpenAIAssistant(api_key=x_assistant_key)
+
+        def run() -> dict[str, Any]:
+            try:
+                if request.studyId is None:
+                    if assistant.available:
+                        raise ValueError("studyId is required for assistant context")
+                    # Preserve the old no-key offline workflow without trusting
+                    # any client-supplied observations or review values.
+                    return assistant.report_draft(
+                        {
+                            "observations": [],
+                            "review": {"decisions": {}, "notes": ""},
+                            "clinicianText": request.clinicianText,
+                        }
+                    )
+                return core.assistant_report(
+                    session,
+                    request.studyId,
+                    request.clinicianText,
+                    request.reviewId,
+                    assistant,
+                )
+            except RuntimeError as exc:
+                # Offline mode remains useful without pretending an LLM ran.
+                return {
+                    "draft": request.clinicianText,
+                    "cautions": [
+                        str(exc),
+                        "本结果为离线草稿，必须由医生编辑并确认",
+                    ],
+                }
+
+        return operation(run)
 
     @app.post("/api/assistant/experiment")
     def assistant_experiment(
@@ -206,7 +257,7 @@ def create_app(root: str | Path = "./runtime") -> Any:
         session: UserSession = Depends(permission("assistant")),
         x_assistant_key: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        payload = {"aggregateMetrics": request.aggregateMetrics, "perClassMetrics": request.perClassMetrics, "experimentNotes": request.experimentNotes}
+        payload = request.model_dump(mode="json")
         try:
             return OpenAIAssistant(api_key=x_assistant_key).experiment_summary(payload)
         except RuntimeError as exc:

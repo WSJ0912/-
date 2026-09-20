@@ -10,8 +10,11 @@ const RENDERER_ROUTES = Object.freeze([
   ["GET", /^\/api\/studies$/],
   ["GET", /^\/api\/studies\/ST-[A-Z0-9-]+\/preview$/],
   ["POST", /^\/api\/studies\/ST-[A-Z0-9-]+\/predict$/],
+  ["GET", /^\/api\/predictions\/PRD-[A-Z0-9-]+\/cams\/(?:[0-9]|1[0-3])$/],
   ["GET", /^\/api\/models\/active$/],
   ["POST", /^\/api\/reviews$/],
+  ["GET", /^\/api\/reports$/],
+  ["GET", /^\/api\/reports\/RPT-[A-Z0-9-]+\/revisions$/],
   ["POST", /^\/api\/reports\/(draft|confirm)$/],
   ["POST", /^\/api\/assistant\/(report|experiment)$/],
 ]);

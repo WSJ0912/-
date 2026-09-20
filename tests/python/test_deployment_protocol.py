@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import unittest
 
+from cxr_research.artifacts import read_medexperiment
 from cxr_research.cli import _select_deployment, _validate_deployment_checkpoint
+from cxr_research.labels import CHEXPERT_LABELS
 from cxr_research.runner import aggregate_experiment
 from test_utils import case_directory
 
@@ -59,6 +61,51 @@ class DeploymentProtocolTests(unittest.TestCase):
                 "a" * 64,
                 root / "formal.medexperiment",
             )
+
+    def test_formal_bundle_preserves_real_aggregate_curve_points(self) -> None:
+        root = case_directory("deployment-aggregate-curves")
+        per_class = {
+            label: {
+                "auroc": 0.7,
+                "auprc": 0.6,
+                "sensitivity": 0.9,
+                "specificity": 0.5,
+                "f1": 0.65,
+                "brier": 0.2,
+            }
+            for label in CHEXPERT_LABELS
+        }
+        curve = {
+            "roc": [
+                {"x": 0.0, "y": 0.0, "threshold": None},
+                {"x": 1.0, "y": 1.0, "threshold": 0.2},
+            ],
+            "pr": [
+                {"x": 0.0, "y": 1.0, "threshold": None},
+                {"x": 1.0, "y": 0.5, "threshold": 0.2},
+            ],
+        }
+        package = aggregate_experiment(
+            [
+                {
+                    "method": "mixstyle",
+                    "seed": 17,
+                    "formal": True,
+                    "testPrimaryMacroAuroc": 0.7,
+                    "testPrimaryMacroAuprc": 0.6,
+                    "testMetrics": {"per_class": per_class},
+                    "curves": {label: curve for label in CHEXPERT_LABELS},
+                }
+            ],
+            "formal-curves",
+            "a" * 64,
+            root / "formal.medexperiment",
+        )
+        bundle = read_medexperiment(package)
+        self.assertEqual(len(bundle["curves"]), len(CHEXPERT_LABELS))
+        series = bundle["curves"]["mixstyle-seed-17-label-0"]
+        self.assertEqual(series["label"], CHEXPERT_LABELS[0])
+        self.assertEqual(series["roc"][-1]["y"], 1.0)
 
 
 if __name__ == "__main__":

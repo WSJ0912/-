@@ -20,17 +20,24 @@ class LoadedModel:
     manifest: dict[str, Any]
     session: Any
 
-    def predict(self, image: Any) -> tuple[Any, Any]:
+    def predict(self, image: Any) -> tuple[Any, Any | None]:
         if self.session is None:
             raise ModelUnavailableError("尚未安装模型，无法生成预测")
         input_name = self.session.get_inputs()[0].name
+        output_names = [output.name for output in self.session.get_outputs()]
         outputs = self.session.run(None, {input_name: image})
-        if len(outputs) < 2:
-            raise RuntimeError("ONNX 模型必须输出 logits 和 cam_features")
-        logits, features = outputs[0], outputs[1]
+        if "logits" not in output_names:
+            raise RuntimeError("ONNX 模型必须包含 logits 输出")
+        logits = outputs[output_names.index("logits")]
+        cams = outputs[output_names.index("cams")] if "cams" in output_names else None
         if getattr(logits, "shape", (0, 0))[-1] != len(CHEXPERT_LABELS):
             raise RuntimeError("ONNX 模型输出不是完整 CheXpert 14 项")
-        return logits, features
+        if cams is not None and (
+            len(getattr(cams, "shape", ())) != 4
+            or getattr(cams, "shape", (0, 0))[1] != len(CHEXPERT_LABELS)
+        ):
+            raise RuntimeError("ONNX cams 输出必须是 [N, 14, H, W]")
+        return logits, cams
 
 
 class ModelRegistry:
@@ -140,8 +147,8 @@ class ModelRegistry:
         session = ort.InferenceSession(model_bytes, providers=["CPUExecutionProvider"])
         return LoadedModel(package, manifest, session)
 
-    def predict(self, image: Any) -> tuple[Any, Any, dict[str, Any]]:
+    def predict(self, image: Any) -> tuple[Any, Any | None, dict[str, Any]]:
         if self._active is None:
             raise ModelUnavailableError("尚未安装模型，无法生成预测")
-        logits, features = self._active.predict(image)
-        return logits, features, self._active.manifest
+        logits, cams = self._active.predict(image)
+        return logits, cams, self._active.manifest

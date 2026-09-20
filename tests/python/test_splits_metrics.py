@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 import unittest
+from itertools import pairwise
 
 import numpy as np
 from cxr_research.labels import CHEXPERT_LABELS
-from cxr_research.metrics import binary_auprc, binary_auroc, bootstrap_ci, evaluate_multilabel
+from cxr_research.metrics import (
+    binary_auprc,
+    binary_auroc,
+    binary_curve_points,
+    bootstrap_ci,
+    evaluate_multilabel,
+)
 from cxr_research.splits import assert_no_patient_overlap, manifest_sha256, split_patient_records
 from cxr_research.thresholds import select_threshold_for_sensitivity
 
@@ -34,6 +41,26 @@ class SplitMetricTests(unittest.TestCase):
         y = np.array([1, 0, 1, 0])
         p = np.array([0.5, 0.5, 0.5, 0.5])
         self.assertAlmostEqual(binary_auprc(y, p), 0.5)
+
+    def test_aggregate_curve_points_are_monotonic_and_contain_no_rows(self) -> None:
+        curves = binary_curve_points(
+            np.array([0, 1, 0, 1]),
+            np.array([0.1, 0.9, 0.4, 0.7]),
+        )
+        self.assertGreaterEqual(len(curves["roc"]), 2)
+        self.assertTrue(
+            all(
+                left["x"] <= right["x"]
+                for left, right in pairwise(curves["roc"])
+            )
+        )
+        self.assertTrue(
+            all(
+                left["y"] <= right["y"]
+                for left, right in pairwise(curves["roc"])
+            )
+        )
+        self.assertEqual(set(curves["roc"][0]), {"x", "y", "threshold"})
 
     def test_threshold_meets_screening_sensitivity(self) -> None:
         y = np.array([0, 0, 1, 1, 1])
