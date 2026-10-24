@@ -47,10 +47,11 @@ build = [
 [project.scripts]
 cxr-research = "cxr_research.cli:main"
 cxr-inference = "inference_service.cli:main"
+cxr-competition = "cxr_competition.cli:main"
 
 [tool.setuptools]
-packages = ["cxr_research", "inference_service"]
-package-dir = {cxr_research = "ml/cxr_research", inference_service = "services/inference/inference_service"}
+packages = ["cxr_research", "cxr_competition", "inference_service"]
+package-dir = {cxr_research = "ml/cxr_research", cxr_competition = "ml/cxr_competition", inference_service = "services/inference/inference_service"}
 
 [tool.pytest.ini_options]
 testpaths = ["tests/python"]

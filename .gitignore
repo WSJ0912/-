@@ -22,6 +22,10 @@ coverage/
 # Data, images, models and runtime state
 data/*
 !data/.gitkeep
+
+# Organizer-provided competition dataset (images and annotation CSVs stay local)
+cxr_first/
+submissions/
 *.dcm
 *.dicom
 *.png
