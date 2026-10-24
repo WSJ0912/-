@@ -15,7 +15,7 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 
 from .data import TestImageDataset, load_split, records_to_arrays
-from .labels import LABEL_IDS, label_column
+from .labels import LABEL_IDS
 from .metrics import aggregate_by_study, macro_auc, macro_f1, per_class_auc, tune_thresholds
 from .model import load_model_from_checkpoint
 
@@ -86,28 +86,33 @@ def collect_scores(
 
 def write_submission(
     path: str | Path,
-    ids: Sequence[str],
+    study_ids: Sequence[str],
     scores: np.ndarray,
     *,
-    id_column: str = "Study_id",
     label_ids: Sequence[int] = LABEL_IDS,
+    gate: float | None = None,
 ) -> Path:
-    """Write ``<id column>,class_01,...,class_10`` probability rows.
+    """Write the organizer's long-format submission CSV.
 
-    The default identifier is ``Study_id`` because the submission is
-    study-level (one row per examination, probability vector normalized).
+    Columns are ``Study_id, Predict_class, Probability, Gate`` with ten rows per
+    study (class ids 1-10). ``Gate`` is left blank to use the default 0.5
+    threshold; pass ``gate`` to write a custom threshold on every row.
     """
 
     destinations = Path(path)
     destinations.parent.mkdir(parents=True, exist_ok=True)
     score_array = np.asarray(scores, dtype=np.float64)
-    if score_array.shape != (len(ids), len(label_ids)):
-        raise ValueError("scores must be [N, 10] and align with ids")
+    if score_array.shape != (len(study_ids), len(label_ids)):
+        raise ValueError("scores must be [N, 10] and align with study ids")
+    if gate is not None and not 0.0 < float(gate) < 1.0:
+        raise ValueError("gate threshold must be inside (0, 1)")
+    gate_text = "" if gate is None else f"{float(gate):.6f}"
     with destinations.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.writer(handle)
-        writer.writerow([id_column, *[label_column(label_id) for label_id in label_ids]])
-        for row_id, row in zip(ids, score_array, strict=True):
-            writer.writerow([row_id, *[f"{value:.6f}" for value in row]])
+        writer.writerow(["Study_id", "Predict_class", "Probability", "Gate"])
+        for study_id, row in zip(study_ids, score_array, strict=True):
+            for label_id, value in zip(label_ids, row, strict=True):
+                writer.writerow([study_id, label_id, f"{float(value):.6f}", gate_text])
     return destinations
 
 
@@ -121,13 +126,15 @@ def predict(
     device: str = "cuda",
     aggregate: str = "mean",
     normalize: str = "l1",
+    gate: float | None = None,
 ) -> dict[str, Any]:
     """Score one split and write a study-level submission CSV.
 
     Default behaviour matches the organizer request: images of one study are
-    aggregated with the mean of their sigmoid probabilities and every study row
-    is then L1-normalized to a probability vector. ``aggregate="none"`` writes
-    one row per image and requires ``normalize="none"``.
+    aggregated with the mean of their sigmoid probabilities, every study row is
+    L1-normalized, and the CSV is written in the official long format
+    (``Study_id, Predict_class, Probability, Gate``). ``aggregate="none"``
+    writes one row per image and requires ``normalize="none"``.
     """
 
     if aggregate not in SUPPORTED_AGGREGATIONS:
@@ -151,18 +158,17 @@ def predict(
         "studies": len({record.study_id for record in records}),
         "aggregate": aggregate,
         "normalize": normalize,
+        "gate": gate,
     }
     if aggregate == "none":
         ids = [record.dicom_id for record in records]
-        id_column = "Dicom_id"
     else:
         ids, scores = aggregate_by_study(
             [record.study_id for record in records], scores, method=aggregate
         )
         scores = normalize_probabilities(scores, normalize)
-        id_column = "Study_id"
-    write_submission(output_csv, ids, scores, id_column=id_column)
-    summary.update({"rows": len(ids), "idColumn": id_column, "output": str(output_csv)})
+    write_submission(output_csv, ids, scores, gate=gate)
+    summary.update({"rows": len(ids) * len(LABEL_IDS), "output": str(output_csv)})
     return summary
 
 
@@ -206,7 +212,7 @@ def evaluate(
 
 
 def submission_summary(path: str | Path) -> Mapping[str, Any]:
-    """Sanity-check a written submission file."""
+    """Sanity-check a written submission file (official long format)."""
 
     source = Path(path)
     with source.open("r", encoding="utf-8", newline="") as handle:
@@ -214,6 +220,16 @@ def submission_summary(path: str | Path) -> Mapping[str, Any]:
     if len(rows) < 2:
         raise ValueError(f"{source} has no data rows")
     header = rows[0]
-    if len(header) != len(LABEL_IDS) + 1:
-        raise ValueError(f"{source} header must contain one id column and 10 class columns")
-    return {"path": str(source), "rows": len(rows) - 1, "columns": header}
+    if len(header) not in (3, 4) or header[:3] != ["Study_id", "Predict_class", "Probability"]:
+        raise ValueError(f"{source} header must be Study_id,Predict_class,Probability[,Gate]")
+    data = rows[1:]
+    if len(data) % len(LABEL_IDS) != 0:
+        raise ValueError(f"{source} must contain ten rows (classes) per Study_id")
+    studies = len({row[0] for row in data})
+    if len(data) != studies * len(LABEL_IDS):
+        raise ValueError(f"{source} has an uneven number of class rows per Study_id")
+    for row in data:
+        value = float(row[2])
+        if not 0.0 <= value <= 1.0:
+            raise ValueError(f"{source} probability outside [0, 1]: {value}")
+    return {"path": str(source), "rows": len(data), "studies": studies, "columns": header}

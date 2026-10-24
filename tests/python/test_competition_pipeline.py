@@ -12,7 +12,7 @@ from cxr_competition.data import (
     parse_predict_class,
     records_to_arrays,
 )
-from cxr_competition.labels import LABEL_IDS, label_column
+from cxr_competition.labels import LABEL_IDS
 from cxr_competition.metrics import aggregate_by_study, macro_auc, per_class_auc, tune_thresholds
 from cxr_competition.model import build_model, load_checkpoint, save_checkpoint
 from cxr_competition.predict import (
@@ -170,15 +170,26 @@ class CompetitionSubmissionTests(unittest.TestCase):
     def tearDown(self) -> None:
         self._tmp.cleanup()
 
-    def test_write_submission_header_and_rows(self) -> None:
+    def test_write_submission_long_format(self) -> None:
         scores = np.arange(20, dtype=np.float64).reshape(2, 10) / 20.0
         write_submission(self.path, ["study_1", "study_2"], scores)
         with self.path.open("r", encoding="utf-8", newline="") as handle:
             rows = list(csv.reader(handle))
-        self.assertEqual(rows[0], ["Study_id", *[label_column(label_id) for label_id in LABEL_IDS]])
-        self.assertEqual(len(rows), 3)
-        self.assertEqual(rows[1][0], "study_1")
-        self.assertAlmostEqual(float(rows[1][1]), 0.0)
+        self.assertEqual(rows[0], ["Study_id", "Predict_class", "Probability", "Gate"])
+        self.assertEqual(len(rows), 21)  # header + 2 studies * 10 classes
+        self.assertEqual(rows[1], ["study_1", "1", "0.000000", ""])
+        self.assertEqual(rows[11], ["study_2", "1", "0.500000", ""])
+        self.assertEqual([row[1] for row in rows[1:11]], [str(label_id) for label_id in LABEL_IDS])
+
+    def test_write_submission_custom_gate(self) -> None:
+        write_submission(self.path, ["study_1"], np.full((1, 10), 0.5), gate=0.3)
+        with self.path.open("r", encoding="utf-8", newline="") as handle:
+            rows = list(csv.reader(handle))
+        self.assertEqual(rows[1][3], "0.300000")
+
+    def test_write_submission_rejects_invalid_gate(self) -> None:
+        with self.assertRaises(ValueError):
+            write_submission(self.path, ["study_1"], np.full((1, 10), 0.5), gate=1.5)
 
     def test_normalize_probabilities_l1(self) -> None:
         scores = np.asarray([[0.2, 0.3], [1.0, 1.0]], dtype=np.float64)
@@ -191,17 +202,18 @@ class CompetitionSubmissionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             normalize_probabilities(np.ones((1, 2)), "softmax")
 
-    def test_submission_summary_rejects_wrong_width(self) -> None:
+    def test_submission_summary_rejects_wrong_header(self) -> None:
         self.path.write_text("Dicom_id,class_01\npic_1,0.1\n", encoding="utf-8")
         with self.assertRaises(ValueError):
             submission_summary(self.path)
 
     def test_submission_summary_accepts_valid_file(self) -> None:
         scores = np.full((1, 10), 0.5)
-        write_submission(self.path, ["pic_1"], scores)
+        write_submission(self.path, ["study_1"], scores)
         summary = submission_summary(self.path)
-        self.assertEqual(summary["rows"], 1)
-        self.assertEqual(len(summary["columns"]), 11)
+        self.assertEqual(summary["rows"], 10)
+        self.assertEqual(summary["studies"], 1)
+        self.assertEqual(summary["columns"], ["Study_id", "Predict_class", "Probability", "Gate"])
 
 
 class CompetitionModelTests(unittest.TestCase):

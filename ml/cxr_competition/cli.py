@@ -102,6 +102,12 @@ def _build_parser() -> argparse.ArgumentParser:
     predict_parser.add_argument("--device", default="cuda")
     predict_parser.add_argument("--aggregate", choices=("none", "max", "mean"), default="mean")
     predict_parser.add_argument("--normalize", choices=("none", "l1"), default="l1")
+    predict_parser.add_argument(
+        "--gate",
+        type=float,
+        default=None,
+        help="custom threshold written to the Gate column (default: blank, i.e. 0.5)",
+    )
 
     evaluate_parser = subparsers.add_parser("evaluate", help="validation macro AUROC / macro F1")
     _add_data_root(evaluate_parser)
@@ -157,6 +163,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             device=args.device,
             aggregate=args.aggregate,
             normalize=args.normalize,
+            gate=args.gate,
         )
         print(json.dumps(summary, ensure_ascii=False, indent=2))
         return 0

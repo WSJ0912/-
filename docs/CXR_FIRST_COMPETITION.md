@@ -17,7 +17,8 @@
 - 三个划分的患者集合两两无交集（`stats` 命令会校验，交集非零直接报错）。
 - 一次检查可能含 1–7 张图像（train 平均 1.64 张）；`ViewPosition` 含 AP/PA/LATERAL/LL 与缺失值。
 - 图像为可变尺寸 JPG（约 0.7–3.5 MB），竞赛评测为十类多标签，主指标宏平均 AUC、辅助指标宏平均 F1。
-- 提交口径：**按 `Study_id` 提交**，同一 study 的多张图像聚合后做概率归一化（默认 `mean` 聚合 + 行内 L1 归一化）。
+- 提交口径（官方）：长表 CSV，列 `Study_id, Predict_class, Probability, Gate`；每个 `Study_id` 下 10 行（类别 id 1–10），`Probability ∈ [0,1]`，`Gate` 留空表示默认阈值 0.5（自定义阈值才填）。
+  当前实现：同一 study 多图 `mean` 聚合后行内 L1 归一化（可用 `--aggregate` / `--normalize` 调整）。
 - 官方类别映射（1–10）：
 
 | 类别 id | 中文名称 | 英文名称 |
@@ -82,8 +83,8 @@
 
 ## 四、下一步（按依赖顺序）
 
-1. **用官方样例复核提交格式**：当前实现为 `Study_id,class_01…class_10`、同 study 多图 `mean` 聚合、
-   每行 L1 归一化；若官方样例的列名/归一化口径不同，改 `predict.py` 的写出逻辑即可。
+1. **用官方样例复核提交格式**：当前实现为 `Study_id, Predict_class, Probability, Gate` 长表、同 study 多图 `mean` 聚合、
+   每行 L1 归一化；若官方样例口径不同，改 `predict.py` 的写出逻辑即可。
 2. **补提交材料**：`cost.py`（100 图 × 3 轮、batch=1、与 `predict` 共用推理）、
    `pretrain_model/` 权重与 SHA-256、`licenses/` 许可证全文、`模型和推理相关材料清单.xlsx`、
    打包脚本与目录结构。
@@ -92,8 +93,24 @@
 4. **平台集成（暂不做）**：用户已确认暂不接入桌面平台；若后续接入，需要把
    `contracts/labels.json` 迁移为十类契约并同步推理服务与 UI，触碰主分支契约需单独评审。
 
-## 五、待确认（阻塞项）
+## 五、官方运行环境（复赛验证）
 
-- 官方 `submission.csv` 样例（列名与归一化口径以样例为准；当前默认 `Study_id` + `mean` 聚合 + L1）。
+| 项目 | 要求 |
+| --- | --- |
+| GPU | NVIDIA T4 16GB × 1 |
+| CPU / 内存 / 磁盘 | 8 核 / 32 GB / ≥100 GB SSD |
+| 驱动与 CUDA | NVIDIA 驱动 ≥570.117，容器内 CUDA 12.8 + cuDNN 9 |
+| Python / 框架 | Python 3.12，PyTorch 2.10.0，torchvision 0.25.0 |
+| 模型大小 | 压缩前总大小 ≤ 500 MB |
+| 单图时延 | 端到端 ≤ 100 ms（主办方 T4 上 100 图 × 3 轮，`cost.py` 统计） |
+| 数据限制 | 只用主办方训练数据；允许数据增强；不得使用外部标注数据 |
+
+推理侧代码需只依赖 `torch`、`torchvision`、`numpy`、`Pillow`；`scikit-learn` 仅在训练/评估指标函数内部懒加载，
+避免在只有 PyTorch 的评测容器中导入失败。
+
+## 六、待确认（阻塞项）
+
+- 官方 `submission.csv` 示例图（当前按文字说明实现为 `Study_id, Predict_class, Probability, Gate` 长表；
+  概率默认做行内 L1 归一化，若官方要求独立概率可切换 `--normalize none`）。
 - 正式训练 GPU 预算与租用方式；本机无 CUDA（torch 2.14.0+cpu）。
 - 赛事平台与截止时间（区域赛/省赛），以及是否需要 `cost.py` 先于 submission 提交。

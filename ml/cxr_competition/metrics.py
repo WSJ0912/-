@@ -10,7 +10,10 @@ from __future__ import annotations
 from typing import Mapping, Sequence
 
 import numpy as np
-from sklearn.metrics import f1_score, roc_auc_score
+
+# scikit-learn is imported lazily inside the metric functions so the inference
+# path (predict.py / cost.py) also runs in organizer environments that only
+# provide PyTorch, torchvision, numpy, and Pillow.
 
 
 def _resolve_label_ids(
@@ -37,6 +40,8 @@ def per_class_auc(
     score_array = np.asarray(scores, dtype=np.float64)
     if target_array.shape != score_array.shape:
         raise ValueError("targets and scores must share the same shape")
+    from sklearn.metrics import roc_auc_score
+
     resolved = _resolve_label_ids(target_array.shape[1], label_ids)
     result: dict[int, float | None] = {}
     for index, label_id in enumerate(resolved):
@@ -73,6 +78,8 @@ def per_class_f1(
     score_array = np.asarray(scores, dtype=np.float64)
     if target_array.shape != score_array.shape:
         raise ValueError("targets and scores must share the same shape")
+    from sklearn.metrics import f1_score
+
     resolved = _resolve_label_ids(target_array.shape[1], label_ids)
     result: dict[int, float | None] = {}
     for index, label_id in enumerate(resolved):
@@ -111,6 +118,8 @@ def tune_thresholds(
     score_array = np.asarray(scores, dtype=np.float64)
     if target_array.shape != score_array.shape:
         raise ValueError("targets and scores must share the same shape")
+    from sklearn.metrics import f1_score
+
     resolved = _resolve_label_ids(target_array.shape[1], label_ids)
     candidates = list(grid) if grid is not None else [round(0.02 * step, 2) for step in range(1, 50)]
     thresholds: dict[int, float] = {}
