@@ -7,8 +7,8 @@
 | 门禁 | 要求 | 当前状态 |
 | --- | --- | --- |
 | E-01 | Ruff、compileall、Python 单元/集成测试通过 | PASS（合成数据与真实 ONNX Runtime 路径） |
-| E-02 | Electron main/preload/IPC policy 语法、TypeScript、Vite build 通过 | PASS（2026-09-19 本地候选构建） |
-| E-03 | `npm audit --audit-level=low` 无已知漏洞 | PASS（2026-09-19，0 个已知漏洞） |
+| E-02 | Electron main/preload/IPC policy 语法、TypeScript、Vite build 通过 | PASS（2026-10-24 依赖安全升级后重新构建通过） |
+| E-03 | `npm audit --audit-level=low` 无已知漏洞 | PASS（2026-10-24 依赖安全升级后复核，0 个已知漏洞） |
 | E-04 | `.medmodel` 固定 14 输出、全部哈希、ZIP 路径安全 | PASS（自动化测试） |
 | E-05 | PyTorch/ONNX 概率最大误差 `<=1e-4`，logits、特征图与 14 类 CAM 形状正确 | PASS（随机初始化真实 DenseNet 回归测试；不代表医学合理性验证） |
 | E-06 | 导入、匿名化、真实 ONNX Runtime、复核、报告锁定、中文 PDF | PASS（合成工作流 API 测试） |

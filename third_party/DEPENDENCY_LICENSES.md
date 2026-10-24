@@ -154,6 +154,7 @@ dependency before public binary distribution.
 | `adm-zip` | `0.6.1` | MIT |
 | `agent-base` | `7.1.4` | MIT |
 | `ajv` | `8.20.0` | MIT |
+| `ajv-formats` | `3.0.1` | MIT |
 | `ansi-regex` | `5.0.1` | MIT |
 | `ansi-styles` | `4.3.0` | MIT |
 | `app-builder-lib` | `26.15.3` | MIT |
@@ -230,7 +231,7 @@ dependency before public binary distribution.
 | `dunder-proto` | `1.0.1` | MIT |
 | `duplexer2` | `0.1.4` | BSD-3-Clause |
 | `ejs` | `3.1.10` | Apache-2.0 |
-| `electron` | `44.4.3` | MIT |
+| `electron` | `44.9.3` | MIT |
 | `electron-builder` | `26.15.3` | MIT |
 | `electron-builder-squirrel-windows` | `26.15.3` | MIT |
 | `electron-publish` | `26.15.3` | MIT |
@@ -251,7 +252,7 @@ dependency before public binary distribution.
 | `escape-string-regexp` | `4.0.0` | MIT |
 | `exponential-backoff` | `3.1.3` | Apache-2.0 |
 | `fast-deep-equal` | `3.1.3` | MIT |
-| `fast-uri` | `3.1.8` | BSD-3-Clause |
+| `fast-uri` | `3.1.9` | BSD-3-Clause |
 | `fdir` | `6.5.0` | MIT |
 | `fflate` | `0.8.3` | MIT |
 | `filelist` | `1.0.6` | Apache-2.0 |
@@ -285,7 +286,7 @@ dependency before public binary distribution.
 | `has-tostringtag` | `1.0.2` | MIT |
 | `hasown` | `2.0.4` | MIT |
 | `hosted-git-info` | `4.1.0` | ISC |
-| `http-cache-semantics` | `4.2.0` | BSD-2-Clause |
+| `http-cache-semantics` | `4.3.0` | BSD-2-Clause |
 | `http-proxy-agent` | `7.0.2` | MIT |
 | `http2-wrapper` | `1.0.3` | MIT |
 | `https-proxy-agent` | `7.0.6` | MIT |
@@ -410,7 +411,7 @@ dependency before public binary distribution.
 | `signal-exit` | `3.0.7` | ISC |
 | `simple-update-notifier` | `2.0.0` | MIT |
 | `source-map` | `0.6.1` | BSD-3-Clause |
-| `source-map-js` | `1.2.1` | BSD-3-Clause |
+| `source-map-js` | `1.2.2` | BSD-3-Clause |
 | `source-map-support` | `0.5.21` | MIT |
 | `spark-md5` | `3.0.2` | (WTFPL OR MIT) |
 | `sprintf-js` | `1.1.3` | BSD-3-Clause |
@@ -433,8 +434,8 @@ dependency before public binary distribution.
 | `tslib` | `2.8.1` | 0BSD |
 | `type-fest` | `0.13.1` | (MIT OR CC0-1.0) |
 | `typescript` | `5.9.3` | Apache-2.0 |
-| `undici` | `6.28.1` | MIT |
-| `undici` | `7.29.1` | MIT |
+| `undici` | `6.29.1` | MIT |
+| `undici` | `7.30.1` | MIT |
 | `undici-types` | `7.18.2` | MIT |
 | `universalify` | `0.1.2` | MIT |
 | `universalify` | `2.0.1` | MIT |
@@ -444,7 +445,7 @@ dependency before public binary distribution.
 | `utif` | `3.1.0` | MIT |
 | `util-deprecate` | `1.0.2` | MIT |
 | `uuid` | `11.1.1` | MIT |
-| `vite` | `6.4.3` | MIT |
+| `vite` | `6.4.5` | MIT |
 | `webcrypto-core` | `1.9.2` | MIT |
 | `webworker-promise` | `0.5.0` | MIT |
 | `which` | `2.0.2` | ISC |
