@@ -15,7 +15,11 @@ from cxr_competition.data import (
 from cxr_competition.labels import LABEL_IDS, label_column
 from cxr_competition.metrics import aggregate_by_study, macro_auc, per_class_auc, tune_thresholds
 from cxr_competition.model import build_model, load_checkpoint, save_checkpoint
-from cxr_competition.predict import submission_summary, write_submission
+from cxr_competition.predict import (
+    normalize_probabilities,
+    submission_summary,
+    write_submission,
+)
 
 
 def _write_image(path: Path) -> None:
@@ -168,13 +172,24 @@ class CompetitionSubmissionTests(unittest.TestCase):
 
     def test_write_submission_header_and_rows(self) -> None:
         scores = np.arange(20, dtype=np.float64).reshape(2, 10) / 20.0
-        write_submission(self.path, ["pic_1", "pic_2"], scores)
+        write_submission(self.path, ["study_1", "study_2"], scores)
         with self.path.open("r", encoding="utf-8", newline="") as handle:
             rows = list(csv.reader(handle))
-        self.assertEqual(rows[0], ["Dicom_id", *[label_column(label_id) for label_id in LABEL_IDS]])
+        self.assertEqual(rows[0], ["Study_id", *[label_column(label_id) for label_id in LABEL_IDS]])
         self.assertEqual(len(rows), 3)
-        self.assertEqual(rows[1][0], "pic_1")
+        self.assertEqual(rows[1][0], "study_1")
         self.assertAlmostEqual(float(rows[1][1]), 0.0)
+
+    def test_normalize_probabilities_l1(self) -> None:
+        scores = np.asarray([[0.2, 0.3], [1.0, 1.0]], dtype=np.float64)
+        normalized = normalize_probabilities(scores, "l1")
+        np.testing.assert_allclose(normalized.sum(axis=1), np.ones(2))
+        np.testing.assert_allclose(normalized[0], np.asarray([0.4, 0.6]))
+        np.testing.assert_allclose(normalize_probabilities(scores, "none"), scores)
+
+    def test_normalize_probabilities_rejects_unknown_method(self) -> None:
+        with self.assertRaises(ValueError):
+            normalize_probabilities(np.ones((1, 2)), "softmax")
 
     def test_submission_summary_rejects_wrong_width(self) -> None:
         self.path.write_text("Dicom_id,class_01\npic_1,0.1\n", encoding="utf-8")

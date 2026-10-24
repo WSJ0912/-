@@ -30,10 +30,22 @@ class CompetitionLabel:
     en: str
 
 
-DEFAULT_LABELS: tuple[CompetitionLabel, ...] = tuple(
-    CompetitionLabel(label_id, f"class_{label_id:02d}", f"类别 {label_id}", f"Class {label_id}")
-    for label_id in LABEL_IDS
+OFFICIAL_LABELS: tuple[CompetitionLabel, ...] = (
+    CompetitionLabel(1, "enlarged_cardiomediastinum", "纵隔心影增大", "Enlarged Cardiomediastinum"),
+    CompetitionLabel(2, "pneumothorax", "气胸", "Pneumothorax"),
+    CompetitionLabel(3, "consolidation", "肺部实变", "Consolidation"),
+    CompetitionLabel(4, "pneumonia", "肺炎", "Pneumonia"),
+    CompetitionLabel(5, "edema", "肺水肿", "Edema"),
+    CompetitionLabel(6, "cardiomegaly", "心影扩大", "Cardiomegaly"),
+    CompetitionLabel(7, "atelectasis", "肺不张", "Atelectasis"),
+    CompetitionLabel(8, "lung_opacity", "肺部阴影", "Lung Opacity"),
+    CompetitionLabel(9, "pleural_effusion", "胸腔积液", "Pleural Effusion"),
+    CompetitionLabel(10, "no_finding", "无异常发现", "No Finding"),
 )
+
+# The official id-to-name table supplied by the organizer. Class 10 is the
+# single-label "No Finding" class; classes 1-9 are multi-label findings.
+DEFAULT_LABELS: tuple[CompetitionLabel, ...] = OFFICIAL_LABELS
 
 
 def label_column(label_id: int) -> str:

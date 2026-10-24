@@ -17,8 +17,23 @@
 - 三个划分的患者集合两两无交集（`stats` 命令会校验，交集非零直接报错）。
 - 一次检查可能含 1–7 张图像（train 平均 1.64 张）；`ViewPosition` 含 AP/PA/LATERAL/LL 与缺失值。
 - 图像为可变尺寸 JPG（约 0.7–3.5 MB），竞赛评测为十类多标签，主指标宏平均 AUC、辅助指标宏平均 F1。
-- 标签为 1–10 的数字 id，`class 10` 在 train 中只单独出现（12,649 张，41.7%），
-  初步判断对应“无异常/正常”，最终以主办方类别映射表为准（见“待确认”）。
+- 提交口径：**按 `Study_id` 提交**，同一 study 的多张图像聚合后做概率归一化（默认 `mean` 聚合 + 行内 L1 归一化）。
+- 官方类别映射（1–10）：
+
+| 类别 id | 中文名称 | 英文名称 |
+| ---: | --- | --- |
+| 1 | 纵隔心影增大 | Enlarged Cardiomediastinum |
+| 2 | 气胸 | Pneumothorax |
+| 3 | 肺部实变 | Consolidation |
+| 4 | 肺炎 | Pneumonia |
+| 5 | 肺水肿 | Edema |
+| 6 | 心影扩大 | Cardiomegaly |
+| 7 | 肺不张 | Atelectasis |
+| 8 | 肺部阴影 | Lung Opacity |
+| 9 | 胸腔积液 | Pleural Effusion |
+| 10 | 无异常发现 | No Finding |
+
+`class 10` 在 train 中只单独出现（12,649 张，41.7%），对应“无异常发现”；1–9 为多标签发现。
 
 ## 二、竞赛规则与本实现的对应
 
@@ -58,27 +73,27 @@
 # 验证集评估（宏平均 AUC / 宏平均 F1）
 .\.venv\python.exe -m cxr_competition evaluate --checkpoint runs\cxr-first-densenet121\best.pt
 
-# 测试集推理（按图像或按检查聚合）
+# 测试集推理（按 study 聚合 + 概率归一化；默认即 mean + l1）
 .\.venv\python.exe -m cxr_competition predict --checkpoint runs\cxr-first-densenet121\best.pt `
-  --split test --output submissions\submission.csv --device cuda
+  --split test --output submissions\submission.csv --device cuda `
+  --aggregate mean --normalize l1
 .\.venv\python.exe -m cxr_competition verify-submission --submission submissions\submission.csv
 ```
 
 ## 四、下一步（按依赖顺序）
 
-1. **确认官方映射**：10 个类别 id→中英文名（写入 `ml/cxr_competition/labels.py` 的 mapping 文件）以及
-   `submission.csv` 的准确列格式（按 `Dicom_id` 还是按 `Study_id`、列名、精度）。
+1. **用官方样例复核提交格式**：当前实现为 `Study_id,class_01…class_10`、同 study 多图 `mean` 聚合、
+   每行 L1 归一化；若官方样例的列名/归一化口径不同，改 `predict.py` 的写出逻辑即可。
 2. **补提交材料**：`cost.py`（100 图 × 3 轮、batch=1、与 `predict` 共用推理）、
    `pretrain_model/` 权重与 SHA-256、`licenses/` 许可证全文、`模型和推理相关材料清单.xlsx`、
    打包脚本与目录结构。
 3. **正式训练**：租 GPU 后跑 DenseNet-121（ImageNet 初始化），验证集选模；
    记录实际耗时、显存、精度（FP32/FP16）与费用。
-4. **平台集成（可选）**：若要把十类模型接入桌面端，需要把 `contracts/labels.json` 迁移为十类契约，
-   并同步推理服务与 UI；该改动会触碰主分支契约，需单独评审。
+4. **平台集成（暂不做）**：用户已确认暂不接入桌面平台；若后续接入，需要把
+   `contracts/labels.json` 迁移为十类契约并同步推理服务与 UI，触碰主分支契约需单独评审。
 
 ## 五、待确认（阻塞项）
 
-- 10 个类别的 id→名称映射表（用户消息中的 `image.png` 未随文本提供）。
-- 测试提交 `submission.csv` 的列定义与评价粒度（图像级 vs 检查级）。
+- 官方 `submission.csv` 样例（列名与归一化口径以样例为准；当前默认 `Study_id` + `mean` 聚合 + L1）。
 - 正式训练 GPU 预算与租用方式；本机无 CUDA（torch 2.14.0+cpu）。
 - 赛事平台与截止时间（区域赛/省赛），以及是否需要 `cost.py` 先于 submission 提交。

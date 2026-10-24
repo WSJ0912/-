@@ -20,6 +20,25 @@ from .metrics import aggregate_by_study, macro_auc, macro_f1, per_class_auc, tun
 from .model import load_model_from_checkpoint
 
 SUPPORTED_AGGREGATIONS = ("none", "max", "mean")
+SUPPORTED_NORMALIZATIONS = ("none", "l1")
+
+
+def normalize_probabilities(scores: np.ndarray, method: str = "l1") -> np.ndarray:
+    """Normalize per-row probabilities.
+
+    ``l1`` divides every row by its sum so each submitted study row is a
+    normalized probability vector (the organizer asks for normalized
+    probabilities); ``none`` keeps the aggregated values untouched.
+    """
+
+    score_array = np.asarray(scores, dtype=np.float64)
+    if method == "none":
+        return score_array
+    if method != "l1":
+        raise ValueError(f"normalize must be one of {SUPPORTED_NORMALIZATIONS}")
+    sums = score_array.sum(axis=1, keepdims=True)
+    safe_sums = np.where(sums > 0.0, sums, 1.0)
+    return score_array / safe_sums
 
 
 def _resolve_device(name: str) -> Any:
@@ -70,10 +89,14 @@ def write_submission(
     ids: Sequence[str],
     scores: np.ndarray,
     *,
-    id_column: str = "Dicom_id",
+    id_column: str = "Study_id",
     label_ids: Sequence[int] = LABEL_IDS,
 ) -> Path:
-    """Write ``<id column>,class_01,...,class_10`` probability rows."""
+    """Write ``<id column>,class_01,...,class_10`` probability rows.
+
+    The default identifier is ``Study_id`` because the submission is
+    study-level (one row per examination, probability vector normalized).
+    """
 
     destinations = Path(path)
     destinations.parent.mkdir(parents=True, exist_ok=True)
@@ -96,16 +119,23 @@ def predict(
     output_csv: str | Path,
     batch_size: int = 8,
     device: str = "cuda",
-    aggregate: str = "none",
+    aggregate: str = "mean",
+    normalize: str = "l1",
 ) -> dict[str, Any]:
-    """Score one split and write a submission CSV.
+    """Score one split and write a study-level submission CSV.
 
-    ``aggregate="none"`` writes one row per image (``Dicom_id``); ``"max"`` or
-    ``"mean"`` aggregates images to one row per study (``Study_id``).
+    Default behaviour matches the organizer request: images of one study are
+    aggregated with the mean of their sigmoid probabilities and every study row
+    is then L1-normalized to a probability vector. ``aggregate="none"`` writes
+    one row per image and requires ``normalize="none"``.
     """
 
     if aggregate not in SUPPORTED_AGGREGATIONS:
         raise ValueError(f"aggregate must be one of {SUPPORTED_AGGREGATIONS}")
+    if normalize not in SUPPORTED_NORMALIZATIONS:
+        raise ValueError(f"normalize must be one of {SUPPORTED_NORMALIZATIONS}")
+    if aggregate == "none" and normalize != "none":
+        raise ValueError("per-image submissions must not be row-normalized")
     root = Path(data_root)
     labelled = split != "test"
     records = load_split(root / f"{split}.csv", root / split, labelled=labelled)
@@ -120,6 +150,7 @@ def predict(
         "images": len(records),
         "studies": len({record.study_id for record in records}),
         "aggregate": aggregate,
+        "normalize": normalize,
     }
     if aggregate == "none":
         ids = [record.dicom_id for record in records]
@@ -128,6 +159,7 @@ def predict(
         ids, scores = aggregate_by_study(
             [record.study_id for record in records], scores, method=aggregate
         )
+        scores = normalize_probabilities(scores, normalize)
         id_column = "Study_id"
     write_submission(output_csv, ids, scores, id_column=id_column)
     summary.update({"rows": len(ids), "idColumn": id_column, "output": str(output_csv)})
