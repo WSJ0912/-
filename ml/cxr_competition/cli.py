@@ -90,6 +90,13 @@ def _build_parser() -> argparse.ArgumentParser:
     train_parser.set_defaults(pretrained=True)
     train_parser.add_argument("--num-workers", type=int, default=4)
     train_parser.add_argument("--patience", type=int, default=3)
+    train_parser.add_argument("--amp", action="store_true", help="mixed-precision training on CUDA")
+    train_parser.add_argument(
+        "--resume",
+        type=Path,
+        default=None,
+        help="resume from a last.pt training state written by a previous run",
+    )
     train_parser.add_argument("--max-train-images", type=int, default=None, help="smoke-test only")
     train_parser.add_argument("--max-valid-images", type=int, default=None, help="smoke-test only")
 
@@ -147,6 +154,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             pretrained=args.pretrained,
             num_workers=args.num_workers,
             patience=args.patience,
+            amp=args.amp,
+            resume=args.resume,
             max_train_images=args.max_train_images,
             max_valid_images=args.max_valid_images,
         )

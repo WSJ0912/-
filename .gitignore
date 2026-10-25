@@ -25,6 +25,7 @@ data/*
 
 # Organizer-provided competition dataset (images and annotation CSVs stay local)
 cxr_first/
+cxr_first-640/
 submissions/
 *.dcm
 *.dicom
