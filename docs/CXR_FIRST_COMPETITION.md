@@ -36,6 +36,9 @@
 
 `class 10` 在 train 中只单独出现（12,649 张，41.7%），对应“无异常发现”；1–9 为多标签发现。
 
+更完整的数据画像（划分 ID 范围、study 级标签一致性、视图差异、尺寸分布）与精度提升路线见
+[CXR_FIRST_DATASET_ANALYSIS.md](CXR_FIRST_DATASET_ANALYSIS.md)。
+
 ## 二、竞赛规则与本实现的对应
 
 | 规则 | 要求 | 本分支实现 |
